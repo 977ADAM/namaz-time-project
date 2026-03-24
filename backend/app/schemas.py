@@ -3,6 +3,12 @@ from datetime import date
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class PrayerNameValue(BaseModel):
+    key: str
+    label: str
+    time: str
+
+
 class PrayerTimings(BaseModel):
     fajr: str = Field(..., description="Fajr")
     sunrise: str = Field(..., description="Sunrise")
@@ -45,6 +51,36 @@ class PrayerTimesResponse(BaseModel):
     timings: PrayerTimings
     date: PrayerDateInfo
     meta: PrayerMeta
+    next_prayer: PrayerNameValue | None = None
+
+
+class PrayerCalendarDay(BaseModel):
+    requested_date: date
+    readable_date: str
+    hijri_date: str
+    timings: PrayerTimings
+
+
+class PrayerCalendarResponse(BaseModel):
+    year: int
+    month: int
+    timezone: str
+    method: dict = Field(default_factory=dict)
+    days: list[PrayerCalendarDay]
+
+
+class LocationResult(BaseModel):
+    city: str
+    country: str
+    display_name: str
+    latitude: float
+    longitude: float
+    timezone: str | None = None
+
+
+class LocationSearchResponse(BaseModel):
+    query: str
+    results: list[LocationResult]
 
 
 class HealthResponse(BaseModel):

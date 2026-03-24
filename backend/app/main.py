@@ -10,7 +10,15 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.schemas import AppMetaResponse, ErrorResponse, HealthResponse, PrayerTimesResponse, ReadinessResponse
+from app.schemas import (
+    AppMetaResponse,
+    ErrorResponse,
+    HealthResponse,
+    LocationSearchResponse,
+    PrayerCalendarResponse,
+    PrayerTimesResponse,
+    ReadinessResponse,
+)
 from app.service import PrayerTimesService, build_prayer_request
 
 logging.basicConfig(
@@ -124,3 +132,55 @@ async def get_prayer_times(
         return await service.get_prayer_times(request)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get(
+    "/v1/prayer-calendar",
+    response_model=PrayerCalendarResponse,
+    responses={400: {"model": ErrorResponse}, 502: {"model": ErrorResponse}},
+)
+async def get_prayer_calendar(
+    latitude: float = Query(..., ge=-90, le=90, description="Latitude"),
+    longitude: float = Query(..., ge=-180, le=180, description="Longitude"),
+    method: int = Query(2, description="Calculation method"),
+    school: int = Query(0, description="0 = Standard, 1 = Hanafi"),
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+) -> PrayerCalendarResponse:
+    try:
+        return await service.get_prayer_calendar(
+            latitude=latitude,
+            longitude=longitude,
+            method=method,
+            school=school,
+            year=year,
+            month=month,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get(
+    "/v1/locations/search",
+    response_model=LocationSearchResponse,
+    responses={502: {"model": ErrorResponse}},
+)
+async def search_locations(
+    q: str = Query(..., min_length=2, description="City or place query"),
+    limit: int = Query(5, ge=1, le=10),
+) -> LocationSearchResponse:
+    results = await service.search_locations(q, limit=limit)
+    return LocationSearchResponse(query=q, results=results)
+
+
+@app.get(
+    "/v1/locations/reverse",
+    response_model=LocationSearchResponse,
+    responses={400: {"model": ErrorResponse}, 502: {"model": ErrorResponse}},
+)
+async def reverse_location(
+    latitude: float = Query(..., ge=-90, le=90, description="Latitude"),
+    longitude: float = Query(..., ge=-180, le=180, description="Longitude"),
+) -> LocationSearchResponse:
+    result = await service.reverse_geocode(latitude=latitude, longitude=longitude)
+    return LocationSearchResponse(query=f"{latitude},{longitude}", results=[result])

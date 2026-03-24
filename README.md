@@ -1,10 +1,12 @@
 # Namaz Time API
 
-Production-lite сервис для получения времени намаза по координатам и дате.
+Адаптивный сайт и API для просмотра актуального времени намаза по городу или текущему местоположению.
 
 Что уже готово:
 - FastAPI backend с endpoint `GET /v1/prayer-times`
-- frontend, доступный на `/`
+- месячный календарь через `GET /v1/prayer-calendar`
+- поиск города и reverse geocoding через `GET /v1/locations/search` и `GET /v1/locations/reverse`
+- frontend, доступный на `/`, с выбором города, определением геолокации, следующим намазом и таблицей на месяц
 - `health`, `ready` и `meta` endpoints для эксплуатации
 - конфигурация через переменные окружения
 - in-memory TTL cache для снижения нагрузки на внешний prayer API
@@ -54,6 +56,14 @@ docker compose down
 
 ```bash
 curl "http://127.0.0.1:8080/v1/prayer-times?latitude=55.7558&longitude=37.6173&date=2026-03-24&method=2&school=0"
+```
+
+```bash
+curl "http://127.0.0.1:8080/v1/prayer-calendar?latitude=55.7558&longitude=37.6173&year=2026&month=3&method=2&school=0"
+```
+
+```bash
+curl "http://127.0.0.1:8080/v1/locations/search?q=Moscow"
 ```
 
 ## Тесты
