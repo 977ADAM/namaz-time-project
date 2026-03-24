@@ -26,7 +26,7 @@ Production-ready веб-сервис для отображения времен 
 Проект состоит из двух частей:
 
 - `backend/` — FastAPI-приложение, которое выступает единой точкой доступа к внешним провайдерам
-- `frontend/` — статический SPA-интерфейс на vanilla JavaScript и CSS, отдаваемый самим backend
+- `frontend/` — Vite + TypeScript приложение, собираемое в `frontend/dist` и отдаваемое backend в production
 
 Backend отвечает за:
 
@@ -139,6 +139,7 @@ curl "http://127.0.0.1:8080/api/v1/cities/search?q=Tashkent&limit=5"
 source venv/bin/activate
 cp .env.example .env
 export PYTHONPATH=backend
+cd frontend && npm install && npm run build && cd ..
 uvicorn app.main:app --host 127.0.0.1 --port 8080 --reload
 ```
 
@@ -149,6 +150,21 @@ uvicorn app.main:app --host 127.0.0.1 --port 8080 --reload
 - Settings: `http://127.0.0.1:8080/settings`
 - About: `http://127.0.0.1:8080/about`
 - Swagger: `http://127.0.0.1:8080/docs`
+
+## Разработка frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+По умолчанию Vite поднимет dev-сервер, а production-сборка создаётся командой:
+
+```bash
+cd frontend
+npm run build
+```
 
 ## Docker
 

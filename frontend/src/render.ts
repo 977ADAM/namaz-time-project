@@ -1,33 +1,36 @@
-import { PRAYER_LABELS, WEEKDAYS } from "./constants.js";
-import { formatMonthYear, formatTime } from "./formatters.js";
+import { PRAYER_LABELS, WEEKDAYS } from "./constants";
+import type { AppElements } from "./dom";
+import { formatMonthYear, formatTime } from "./formatters";
+import type { AppState } from "./state";
+import type { LocationResult } from "./types";
 
-export function setStatus(elements, message) {
+export function setStatus(elements: AppElements, message: string): void {
   elements.status.textContent = message;
 }
 
-export function setSearchStatus(elements, message) {
+export function setSearchStatus(elements: AppElements, message: string): void {
   elements.searchStatus.textContent = message;
 }
 
-export function renderLocation(state, elements) {
+export function renderLocation(state: AppState, elements: AppElements): void {
   elements.locationName.textContent = state.location.display_name;
   const timezone = state.location.timezone || state.today?.meta?.timezone || "timezone не определён";
   elements.locationMeta.textContent = `${state.location.latitude.toFixed(4)}, ${state.location.longitude.toFixed(4)} • ${timezone}`;
 }
 
-export function renderDates(state, elements) {
+export function renderDates(state: AppState, elements: AppElements): void {
   elements.gregorianDate.textContent = state.today?.date?.readable || "--";
   elements.hijriDate.textContent = state.today?.date?.hijri?.date || "--";
 }
 
-export function renderTodayMeta(state, elements) {
+export function renderTodayMeta(state: AppState, elements: AppElements): void {
   const methodName = state.today?.meta?.method?.name || "Метод не выбран";
   const timezone = state.today?.meta?.timezone || "Без timezone";
   elements.todayTitle.textContent = state.location.display_name;
   elements.todayMeta.textContent = `${methodName} • ${timezone}`;
 }
 
-export function renderTodayTimings(state, elements) {
+export function renderTodayTimings(state: AppState, elements: AppElements): void {
   elements.todayTimes.innerHTML = "";
   if (!state.today?.timings) {
     elements.todayTimes.innerHTML = `<div class="empty-state">Нет данных для отображения.</div>`;
@@ -38,14 +41,14 @@ export function renderTodayTimings(state, elements) {
     const card = document.createElement("article");
     card.className = "timing-card";
     card.innerHTML = `
-      <span class="timing-name">${PRAYER_LABELS[key] || key}</span>
+      <span class="timing-name">${PRAYER_LABELS[key as keyof typeof PRAYER_LABELS] || key}</span>
       <strong class="timing-value">${formatTime(rawTime, state.timeFormat)}</strong>
     `;
     elements.todayTimes.appendChild(card);
   });
 }
 
-export function renderMonthlyMeta(state, elements) {
+export function renderMonthlyMeta(state: AppState, elements: AppElements): void {
   const monthLabel = formatMonthYear(state.monthlyDate);
   elements.monthCurrentLabel.textContent = monthLabel;
   elements.monthlyTitle.textContent = `Расписание на ${monthLabel}`;
@@ -54,7 +57,7 @@ export function renderMonthlyMeta(state, elements) {
   elements.monthlyMeta.textContent = `${state.location.display_name} • ${methodName}`;
 }
 
-export function renderMonthlyTable(state, elements) {
+export function renderMonthlyTable(state: AppState, elements: AppElements): void {
   if (!state.monthly?.days?.length) {
     elements.monthlyBody.innerHTML = `
       <tr>
@@ -69,7 +72,7 @@ export function renderMonthlyTable(state, elements) {
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${day.readable_date}</td>
-      <td>${WEEKDAYS[day.weekday] || day.weekday}</td>
+      <td>${WEEKDAYS[day.weekday as keyof typeof WEEKDAYS] || day.weekday}</td>
       <td>${day.hijri_date || "—"}</td>
       <td>${formatTime(day.timings.fajr, state.timeFormat)}</td>
       <td>${formatTime(day.timings.sunrise, state.timeFormat)}</td>
@@ -82,7 +85,11 @@ export function renderMonthlyTable(state, elements) {
   });
 }
 
-export function renderSearchResults(results, elements, onSelect) {
+export function renderSearchResults(
+  results: LocationResult[],
+  elements: AppElements,
+  onSelect: (location: LocationResult) => void | Promise<void>
+): void {
   elements.searchResults.innerHTML = "";
   if (!results.length) {
     elements.searchResults.innerHTML = `<div class="empty-state compact">Ничего не найдено. Попробуйте другой запрос.</div>`;
@@ -98,12 +105,14 @@ export function renderSearchResults(results, elements, onSelect) {
       <span>${[result.region, result.country].filter(Boolean).join(", ")}</span>
       <small>${result.timezone || "timezone будет определён автоматически"}</small>
     `;
-    button.addEventListener("click", () => onSelect(result));
+    button.addEventListener("click", () => {
+      void onSelect(result);
+    });
     elements.searchResults.appendChild(button);
   });
 }
 
-export function syncSettings(state, elements) {
+export function syncSettings(state: AppState, elements: AppElements): void {
   elements.settingsMethod.innerHTML = state.methods
     .map((method) => `<option value="${method.id}">${method.name}</option>`)
     .join("");

@@ -1,3 +1,5 @@
+import type { LocationResult } from "./types";
+
 export const STORAGE_KEYS = {
   selectedCity: "selectedCity",
   calculationMethod: "calculationMethod",
@@ -5,9 +7,9 @@ export const STORAGE_KEYS = {
   theme: "theme",
   timeFormat: "timeFormat",
   school: "school",
-};
+} as const;
 
-export const DEFAULT_LOCATION = {
+export const DEFAULT_LOCATION: LocationResult = {
   id: "default-moscow",
   city: "Moscow",
   country: "Russia",
@@ -25,7 +27,7 @@ export const PRAYER_LABELS = {
   asr: "Аср",
   maghrib: "Магриб",
   isha: "Иша",
-};
+} as const;
 
 export const WEEKDAYS = {
   Monday: "Понедельник",
@@ -35,11 +37,11 @@ export const WEEKDAYS = {
   Friday: "Пятница",
   Saturday: "Суббота",
   Sunday: "Воскресенье",
-};
+} as const;
 
 export const ROUTE_TITLES = {
   "/": "Времена намаза",
   "/monthly": "Месячное расписание намаза",
   "/settings": "Настройки Namaz Time",
   "/about": "О проекте Namaz Time",
-};
+} as const;

@@ -1,8 +1,9 @@
-import { reverseLocation, loadMethods, loadPrayerBundle, searchCities } from "./api.js";
-import { STORAGE_KEYS } from "./constants.js";
-import { getElements } from "./dom.js";
-import { formatTime } from "./formatters.js";
-import { getPrayerState } from "./prayer.js";
+import { reverseLocation, loadMethods, loadPrayerBundle, searchCities } from "./api";
+import { STORAGE_KEYS } from "./constants";
+import type { AppElements } from "./dom";
+import { getElements } from "./dom";
+import { formatTime } from "./formatters";
+import { getPrayerState } from "./prayer";
 import {
   renderDates,
   renderLocation,
@@ -14,27 +15,49 @@ import {
   setSearchStatus,
   setStatus,
   syncSettings,
-} from "./render.js";
-import { navigate, setRoute } from "./router.js";
-import { createAppState } from "./state.js";
-import { saveLocation, writeSetting } from "./storage.js";
+} from "./render";
+import { navigate, setRoute } from "./router";
+import { createAppState, type AppState } from "./state";
+import { saveLocation, writeSetting } from "./storage";
+import type { LocationResult } from "./types";
 
-const state = createAppState();
-const elements = getElements();
+export function initApp(): void {
+  const state = createAppState();
+  const elements = getElements();
 
-function setTheme(theme) {
-  state.theme = theme;
-  writeSetting(STORAGE_KEYS.theme, theme);
+  void bootstrap(state, elements);
+}
+
+async function bootstrap(state: AppState, elements: AppElements): Promise<void> {
+  try {
+    setRoute(window.location.pathname, elements);
+    setTheme(state);
+    renderLocation(state, elements);
+    bindEvents(state, elements);
+
+    const methodsPayload = await loadMethods();
+    state.methods = methodsPayload.methods;
+    syncSettings(state, elements);
+
+    await loadPrayerData(state, elements);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Не удалось инициализировать приложение";
+    setStatus(elements, message);
+    setSearchStatus(elements, message);
+  }
+}
+
+function setTheme(state: AppState): void {
   const resolvedTheme =
-    theme === "system"
+    state.theme === "system"
       ? window.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
         : "light"
-      : theme;
+      : state.theme;
   document.documentElement.dataset.theme = resolvedTheme;
 }
 
-function renderAll() {
+function renderAll(state: AppState, elements: AppElements): void {
   renderLocation(state, elements);
   renderDates(state, elements);
   renderTodayMeta(state, elements);
@@ -44,7 +67,7 @@ function renderAll() {
   syncSettings(state, elements);
 }
 
-function updateCountdown() {
+function updateCountdown(state: AppState, elements: AppElements): void {
   const { current, next } = getPrayerState(state.today, state.tomorrow);
 
   if (current) {
@@ -55,7 +78,7 @@ function updateCountdown() {
     elements.currentPrayerTime.textContent = "Первым будет Фаджр";
   }
 
-  if (!next) {
+  if (!next || !state.today) {
     elements.nextPrayerName.textContent = "Ожидаем следующее обновление";
     elements.nextPrayerTime.textContent = "Нужны данные на следующий день";
     elements.countdownValue.textContent = "--:--:--";
@@ -81,13 +104,15 @@ function updateCountdown() {
   elements.countdownMeta.textContent = "До следующего намаза";
 }
 
-function startCountdown() {
-  window.clearInterval(state.countdownTimer);
-  updateCountdown();
-  state.countdownTimer = window.setInterval(updateCountdown, 1000);
+function startCountdown(state: AppState, elements: AppElements): void {
+  if (state.countdownTimer) {
+    window.clearInterval(state.countdownTimer);
+  }
+  updateCountdown(state, elements);
+  state.countdownTimer = window.setInterval(() => updateCountdown(state, elements), 1000);
 }
 
-async function loadPrayerData() {
+async function loadPrayerData(state: AppState, elements: AppElements): Promise<void> {
   const currentDate = new Date();
   const todayValue = currentDate.toISOString().slice(0, 10);
   const tomorrowDate = new Date(currentDate);
@@ -112,12 +137,12 @@ async function loadPrayerData() {
   state.location.timezone = todayPayload.meta?.timezone || state.location.timezone;
   saveLocation(state.location);
 
-  renderAll();
-  startCountdown();
+  renderAll(state, elements);
+  startCountdown(state, elements);
   setStatus(elements, "Данные обновлены.");
 }
 
-async function applyLocation(location) {
+async function applyLocation(state: AppState, elements: AppElements, location: LocationResult): Promise<void> {
   state.location = {
     ...location,
     latitude: Number(location.latitude),
@@ -126,10 +151,10 @@ async function applyLocation(location) {
   saveLocation(state.location);
   renderLocation(state, elements);
   syncSettings(state, elements);
-  await loadPrayerData();
+  await loadPrayerData(state, elements);
 }
 
-async function handleSearch(query) {
+async function handleSearch(state: AppState, elements: AppElements, query: string): Promise<void> {
   const normalized = query.trim();
   if (normalized.length < 2) {
     elements.searchResults.innerHTML = "";
@@ -140,21 +165,25 @@ async function handleSearch(query) {
   setSearchStatus(elements, "Ищем города...");
   const payload = await searchCities(normalized, 5);
   renderSearchResults(payload.results, elements, async (result) => {
-    await applyLocation(result);
+    await applyLocation(state, elements, result);
     elements.searchResults.innerHTML = "";
     setSearchStatus(elements, "Город выбран.");
   });
   setSearchStatus(elements, payload.results.length ? "Выберите подходящий вариант." : "Ничего не найдено.");
 }
 
-function debounceSearch(query) {
-  window.clearTimeout(state.debounceTimer);
+function debounceSearch(state: AppState, elements: AppElements, query: string): void {
+  if (state.debounceTimer) {
+    window.clearTimeout(state.debounceTimer);
+  }
   state.debounceTimer = window.setTimeout(() => {
-    handleSearch(query).catch((error) => setSearchStatus(elements, error.message));
+    void handleSearch(state, elements, query).catch((error: unknown) => {
+      setSearchStatus(elements, error instanceof Error ? error.message : "Ошибка поиска");
+    });
   }, 350);
 }
 
-function detectLocation() {
+function detectLocation(state: AppState, elements: AppElements): void {
   if (!navigator.geolocation) {
     setSearchStatus(elements, "Геолокация недоступна. Используйте ручной поиск.");
     return;
@@ -168,10 +197,10 @@ function detectLocation() {
         if (!payload.results.length) {
           throw new Error("Не удалось определить город по координатам.");
         }
-        await applyLocation(payload.results[0]);
+        await applyLocation(state, elements, payload.results[0]);
         setSearchStatus(elements, "Местоположение определено.");
       } catch (error) {
-        setSearchStatus(elements, error.message);
+        setSearchStatus(elements, error instanceof Error ? error.message : "Ошибка геолокации");
       }
     },
     () => {
@@ -181,87 +210,77 @@ function detectLocation() {
   );
 }
 
-function shiftMonth(offset) {
+function shiftMonth(state: AppState, elements: AppElements, offset: number): void {
   state.monthlyDate = new Date(state.monthlyDate.getFullYear(), state.monthlyDate.getMonth() + offset, 1);
-  loadPrayerData().catch((error) => setStatus(elements, error.message));
+  void loadPrayerData(state, elements).catch((error: unknown) => {
+    setStatus(elements, error instanceof Error ? error.message : "Ошибка загрузки месяца");
+  });
 }
 
-function bindEvents() {
+function bindEvents(state: AppState, elements: AppElements): void {
   elements.cityForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    handleSearch(elements.cityQuery.value).catch((error) => setSearchStatus(elements, error.message));
+    void handleSearch(state, elements, elements.cityQuery.value).catch((error: unknown) => {
+      setSearchStatus(elements, error instanceof Error ? error.message : "Ошибка поиска");
+    });
   });
 
   elements.cityQuery.addEventListener("input", (event) => {
-    debounceSearch(event.target.value);
+    debounceSearch(state, elements, (event.target as HTMLInputElement).value);
   });
 
-  elements.locateButton.addEventListener("click", detectLocation);
+  elements.locateButton.addEventListener("click", () => detectLocation(state, elements));
   elements.retryButton.addEventListener("click", () => {
-    loadPrayerData().catch((error) => setStatus(elements, error.message));
+    void loadPrayerData(state, elements).catch((error: unknown) => {
+      setStatus(elements, error instanceof Error ? error.message : "Ошибка загрузки");
+    });
   });
-  elements.prevMonthButton.addEventListener("click", () => shiftMonth(-1));
-  elements.nextMonthButton.addEventListener("click", () => shiftMonth(1));
+  elements.prevMonthButton.addEventListener("click", () => shiftMonth(state, elements, -1));
+  elements.nextMonthButton.addEventListener("click", () => shiftMonth(state, elements, 1));
 
   elements.settingsMethod.addEventListener("change", async (event) => {
-    state.method = event.target.value;
+    state.method = (event.target as HTMLSelectElement).value;
     writeSetting(STORAGE_KEYS.calculationMethod, state.method);
-    await loadPrayerData();
+    await loadPrayerData(state, elements);
   });
 
   elements.settingsSchool.addEventListener("change", async (event) => {
-    state.school = event.target.value;
+    state.school = (event.target as HTMLSelectElement).value;
     writeSetting(STORAGE_KEYS.school, state.school);
-    await loadPrayerData();
+    await loadPrayerData(state, elements);
   });
 
   elements.settingsLanguage.addEventListener("change", (event) => {
-    state.language = event.target.value;
+    state.language = (event.target as HTMLSelectElement).value;
     writeSetting(STORAGE_KEYS.language, state.language);
   });
 
   elements.settingsTheme.addEventListener("change", (event) => {
-    setTheme(event.target.value);
+    state.theme = (event.target as HTMLSelectElement).value;
+    writeSetting(STORAGE_KEYS.theme, state.theme);
+    setTheme(state);
     syncSettings(state, elements);
   });
 
   elements.settingsTimeFormat.addEventListener("change", (event) => {
-    state.timeFormat = event.target.value;
+    state.timeFormat = (event.target as HTMLSelectElement).value;
     writeSetting(STORAGE_KEYS.timeFormat, state.timeFormat);
     renderTodayTimings(state, elements);
     renderMonthlyTable(state, elements);
-    updateCountdown();
+    updateCountdown(state, elements);
   });
 
   elements.navLinks.forEach((link) => {
     link.addEventListener("click", (event) => {
       event.preventDefault();
-      navigate(link.getAttribute("href"), elements);
+      navigate(link.getAttribute("href") || "/", elements);
     });
   });
 
   window.addEventListener("popstate", () => setRoute(window.location.pathname, elements));
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if (state.theme === "system") {
-      setTheme("system");
+      setTheme(state);
     }
   });
-}
-
-export async function initApp() {
-  try {
-    setRoute(window.location.pathname, elements);
-    setTheme(state.theme);
-    renderLocation(state, elements);
-    bindEvents();
-
-    const methodsPayload = await loadMethods();
-    state.methods = methodsPayload.methods;
-    syncSettings(state, elements);
-
-    await loadPrayerData();
-  } catch (error) {
-    setStatus(elements, error.message);
-    setSearchStatus(elements, error.message);
-  }
 }

@@ -1,3 +1,14 @@
+FROM node:24-slim AS frontend-builder
+
+WORKDIR /app/frontend
+
+COPY frontend/package.json frontend/tsconfig.json frontend/vite.config.ts ./
+COPY frontend/src ./src
+COPY frontend/index.html ./
+
+RUN npm install
+RUN npm run build
+
 FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -9,6 +20,7 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY backend ./backend
 COPY frontend ./frontend
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 RUN pip install --no-cache-dir .
 

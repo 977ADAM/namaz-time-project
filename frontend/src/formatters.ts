@@ -1,4 +1,4 @@
-export function formatTime(rawTime, timeFormat) {
+export function formatTime(rawTime: string, timeFormat: string): string {
   if (!rawTime) {
     return "--";
   }
@@ -14,7 +14,7 @@ export function formatTime(rawTime, timeFormat) {
   return `${formattedHours}:${minutes} ${suffix}`;
 }
 
-export function parsePrayerTime(dateString, timeString, timezone) {
+export function parsePrayerTime(dateString: string, timeString: string, timezone: string): Date | null {
   if (!dateString || !timeString || !timezone) {
     return null;
   }
@@ -29,6 +29,6 @@ export function parsePrayerTime(dateString, timeString, timezone) {
   return new Date(utcDate.getTime() - (tzDate.getTime() - localDate.getTime()));
 }
 
-export function formatMonthYear(date, locale = "ru-RU") {
+export function formatMonthYear(date: Date, locale = "ru-RU"): string {
   return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(date);
 }

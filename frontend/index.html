@@ -14,14 +14,12 @@
       content="Быстрый и удобный сайт с временами намаза, определением города, таймером и расписанием на месяц."
     />
     <meta property="og:type" content="website" />
-    <link rel="canonical" href="/" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
     <div class="background-orb background-orb-one" aria-hidden="true"></div>
@@ -48,8 +46,8 @@
       <section class="hero-panel">
         <div class="hero-copy">
           <p class="eyebrow">Production-ready prayer times</p>
-          <h1 id="hero-title">Актуальные времена намаза для вашего города.</h1>
-          <p class="hero-text" id="hero-subtitle">
+          <h1>Актуальные времена намаза для вашего города.</h1>
+          <p class="hero-text">
             Определяйте местоположение автоматически или выбирайте город вручную, чтобы увидеть
             расписание на сегодня, следующий намаз и календарь на месяц.
           </p>
@@ -250,16 +248,14 @@
             </p>
             <p>
               Геолокация используется только после явного согласия пользователя в браузере.
-              Пользовательские настройки сохраняются локально в браузере через `localStorage`.
+              Пользовательские настройки сохраняются локально в браузере через localStorage.
             </p>
-            <p>
-              Контакты: <a href="mailto:support@example.com">support@example.com</a>
-            </p>
+            <p>Контакты: <a href="mailto:support@example.com">support@example.com</a></p>
           </div>
         </section>
       </section>
     </main>
 
-    <script type="module" src="/static/app.js"></script>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

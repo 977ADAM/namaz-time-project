@@ -34,6 +34,8 @@ logger = logging.getLogger(__name__)
 service = PrayerTimesService()
 ROOT_DIR = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = ROOT_DIR / "frontend"
+DIST_DIR = FRONTEND_DIR / "dist"
+ASSETS_DIR = DIST_DIR / "assets"
 STATIC_DIR = FRONTEND_DIR / "static"
 
 
@@ -68,7 +70,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if STATIC_DIR.exists():
+if ASSETS_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
+elif STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
@@ -117,7 +121,7 @@ async def app_meta() -> AppMetaResponse:
 
 
 def render_index() -> HTMLResponse | dict[str, str]:
-    index_file = FRONTEND_DIR / "index.html"
+    index_file = DIST_DIR / "index.html" if (DIST_DIR / "index.html").exists() else FRONTEND_DIR / "index.html"
     if index_file.exists():
         return HTMLResponse(index_file.read_text(encoding="utf-8"))
     return {"message": f"{settings.app_name} is running"}
