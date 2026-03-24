@@ -7,6 +7,7 @@ export interface AppElements {
   searchResults: HTMLDivElement;
   favoritesList: HTMLDivElement;
   favoriteToggleButton: HTMLButtonElement;
+  quickPresetsList: HTMLDivElement;
   status: HTMLParagraphElement;
   heroPrayerCard: HTMLElement;
   heroPrayerName: HTMLElement;
@@ -40,6 +41,14 @@ export interface AppElements {
   settingsTimeFormat: HTMLSelectElement;
   notificationButton: HTMLButtonElement;
   notificationStatus: HTMLParagraphElement;
+  notificationLeadMinutes: HTMLSelectElement;
+  notificationCurrentCityOnly: HTMLInputElement;
+  notificationPrayerCheckboxes: HTMLInputElement[];
+  trustMethod: HTMLElement;
+  trustTimezone: HTMLElement;
+  trustSource: HTMLElement;
+  trustUpdated: HTMLElement;
+  trustDisclaimer: HTMLParagraphElement;
   navLinks: HTMLAnchorElement[];
   routeSections: HTMLElement[];
 }
@@ -62,6 +71,7 @@ export function getElements(): AppElements {
     searchResults: queryRequired<HTMLDivElement>("#search-results"),
     favoritesList: queryRequired<HTMLDivElement>("#favorites-list"),
     favoriteToggleButton: queryRequired<HTMLButtonElement>("#favorite-toggle-button"),
+    quickPresetsList: queryRequired<HTMLDivElement>("#quick-presets-list"),
     status: queryRequired<HTMLParagraphElement>("#status"),
     heroPrayerCard: queryRequired<HTMLElement>("#hero-prayer-card"),
     heroPrayerName: queryRequired<HTMLElement>("#hero-prayer-name"),
@@ -95,6 +105,16 @@ export function getElements(): AppElements {
     settingsTimeFormat: queryRequired<HTMLSelectElement>("#settings-time-format"),
     notificationButton: queryRequired<HTMLButtonElement>("#notifications-button"),
     notificationStatus: queryRequired<HTMLParagraphElement>("#notifications-status"),
+    notificationLeadMinutes: queryRequired<HTMLSelectElement>("#notifications-lead-minutes"),
+    notificationCurrentCityOnly: queryRequired<HTMLInputElement>("#notifications-current-city-only"),
+    notificationPrayerCheckboxes: Array.from(
+      document.querySelectorAll<HTMLInputElement>('input[name="notification-prayer"]')
+    ),
+    trustMethod: queryRequired("#trust-method"),
+    trustTimezone: queryRequired("#trust-timezone"),
+    trustSource: queryRequired("#trust-source"),
+    trustUpdated: queryRequired("#trust-updated"),
+    trustDisclaimer: queryRequired<HTMLParagraphElement>("#trust-disclaimer"),
     navLinks: Array.from(document.querySelectorAll<HTMLAnchorElement>("[data-nav]")),
     routeSections: Array.from(document.querySelectorAll<HTMLElement>(".route-section")),
   };

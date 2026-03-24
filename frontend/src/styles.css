@@ -320,6 +320,17 @@ h2 {
   margin-top: 12px;
 }
 
+.quick-presets-head {
+  margin-top: 22px;
+}
+
+.quick-presets-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
 .compact-button {
   min-height: 40px;
   padding-inline: 14px;
@@ -338,6 +349,51 @@ h2 {
 .favorite-chip-active {
   background: linear-gradient(135deg, var(--accent), #13a699);
   color: #fff;
+}
+
+.preset-card {
+  min-height: 96px;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.42), transparent 36%),
+    rgba(255, 255, 255, 0.46);
+  color: var(--ink);
+  text-align: left;
+}
+
+.preset-card-active {
+  border-color: rgba(15, 118, 110, 0.4);
+  box-shadow: 0 16px 30px rgba(15, 118, 110, 0.14);
+}
+
+.preset-card-empty {
+  border-style: dashed;
+}
+
+.preset-label,
+.preset-title,
+.preset-meta {
+  display: block;
+}
+
+.preset-label {
+  margin-bottom: 8px;
+  font-size: 0.76rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.preset-title {
+  font-size: 1.1rem;
+}
+
+.preset-meta {
+  margin-top: 6px;
+  color: var(--muted);
 }
 
 input,
@@ -410,7 +466,8 @@ button:hover {
 
 .metric-card,
 .date-card,
-.timing-card {
+.timing-card,
+.trust-card {
   padding: 20px;
   border-radius: 22px;
   border: 1px solid var(--line);
@@ -510,6 +567,46 @@ button:hover {
   animation: heroBurst 850ms ease;
 }
 
+.trust-card {
+  margin-top: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.38), transparent 32%),
+    rgba(255, 255, 255, 0.34);
+}
+
+.trust-head {
+  align-items: start;
+}
+
+.trust-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.trust-item {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.trust-item strong {
+  display: block;
+  font-size: 1.05rem;
+}
+
+.trust-disclaimer {
+  margin: 16px 0 0;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(196, 139, 50, 0.32);
+  background: linear-gradient(135deg, rgba(196, 139, 50, 0.12), rgba(15, 118, 110, 0.08));
+  color: var(--ink);
+  line-height: 1.6;
+}
+
 .metric-label {
   display: block;
   margin-bottom: 10px;
@@ -589,6 +686,52 @@ button:hover {
   border: 1px solid var(--line);
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.28);
+}
+
+.compact-field {
+  margin-top: 14px;
+}
+
+.notification-prayers {
+  margin: 16px 0 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.notification-prayers legend {
+  margin-bottom: 10px;
+  color: var(--muted);
+}
+
+.check-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.check-chip input,
+.toggle-row input {
+  width: auto;
+  min-height: auto;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  color: var(--ink);
+}
+
+.compact-meta {
+  margin: 0;
 }
 
 .month-current {
@@ -676,7 +819,9 @@ button:hover {
   .summary-grid,
   .dates-row,
   .timings-grid,
-  .toolbar {
+  .toolbar,
+  .trust-grid,
+  .quick-presets-list {
     grid-template-columns: 1fr;
     flex-direction: column;
     align-items: stretch;

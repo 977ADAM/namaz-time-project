@@ -1,4 +1,4 @@
-import type { LocationResult } from "./types";
+import type { LocationResult, NotifiablePrayerKey, QuickPreset } from "./types";
 
 export const STORAGE_KEYS = {
   selectedCity: "selectedCity",
@@ -9,6 +9,10 @@ export const STORAGE_KEYS = {
   timeFormat: "timeFormat",
   school: "school",
   notificationsEnabled: "notificationsEnabled",
+  notificationLeadMinutes: "notificationLeadMinutes",
+  notificationPrayerKeys: "notificationPrayerKeys",
+  notificationCurrentCityOnly: "notificationCurrentCityOnly",
+  quickPresetLocations: "quickPresetLocations",
 } as const;
 
 export const DEFAULT_LOCATION: LocationResult = {
@@ -22,6 +26,36 @@ export const DEFAULT_LOCATION: LocationResult = {
   timezone: "Europe/Moscow",
 };
 
+export const QUICK_PRESET_BASE_LOCATIONS: Record<string, LocationResult> = {
+  makkah: {
+    id: "preset-makkah",
+    city: "Makkah",
+    country: "Saudi Arabia",
+    region: "Makkah Province",
+    display_name: "Makkah, Saudi Arabia",
+    latitude: 21.3891,
+    longitude: 39.8579,
+    timezone: "Asia/Riyadh",
+  },
+  tashkent: {
+    id: "preset-tashkent",
+    city: "Tashkent",
+    country: "Uzbekistan",
+    region: "Tashkent",
+    display_name: "Tashkent, Uzbekistan",
+    latitude: 41.2995,
+    longitude: 69.2401,
+    timezone: "Asia/Tashkent",
+  },
+};
+
+export const QUICK_PRESET_DEFAULTS: QuickPreset[] = [
+  { id: "home", label: "Дом", location: null, assignable: true },
+  { id: "work", label: "Работа", location: null, assignable: true },
+  { id: "makkah", label: "Мекка", location: QUICK_PRESET_BASE_LOCATIONS.makkah, assignable: false },
+  { id: "tashkent", label: "Ташкент", location: QUICK_PRESET_BASE_LOCATIONS.tashkent, assignable: false },
+];
+
 export const PRAYER_LABELS = {
   fajr: "Фаджр",
   sunrise: "Восход",
@@ -30,6 +64,8 @@ export const PRAYER_LABELS = {
   maghrib: "Магриб",
   isha: "Иша",
 } as const;
+
+export const NOTIFIABLE_PRAYER_KEYS: NotifiablePrayerKey[] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
 
 export const WEEKDAYS = {
   Monday: "Понедельник",

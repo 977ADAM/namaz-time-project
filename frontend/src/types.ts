@@ -1,4 +1,5 @@
 export type PrayerKey = "fajr" | "sunrise" | "dhuhr" | "asr" | "maghrib" | "isha";
+export type NotifiablePrayerKey = Exclude<PrayerKey, "sunrise">;
 
 export interface LocationResult {
   id: string;
@@ -114,4 +115,11 @@ export interface PrayerMoment {
   time: string;
   date: string;
   datetime: Date;
+}
+
+export interface QuickPreset {
+  id: string;
+  label: string;
+  location: LocationResult | null;
+  assignable: boolean;
 }

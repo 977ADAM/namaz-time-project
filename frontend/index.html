@@ -82,6 +82,12 @@
           </div>
           <div id="favorites-list" class="favorites-list" aria-live="polite"></div>
 
+          <div class="favorites-head quick-presets-head">
+            <span class="metric-label">Быстрые пресеты</span>
+            <span class="panel-meta compact-meta">Дом, Работа, Мекка, Ташкент</span>
+          </div>
+          <div id="quick-presets-list" class="quick-presets-list" aria-live="polite"></div>
+
           <div id="search-status" class="search-status" aria-live="polite"></div>
           <div id="search-results" class="search-results" aria-live="polite"></div>
         </aside>
@@ -146,6 +152,39 @@
                 <strong id="hijri-date">--</strong>
               </div>
             </div>
+
+            <article class="trust-card" aria-live="polite">
+              <div class="panel-head trust-head">
+                <div>
+                  <p class="eyebrow">Trust Layer</p>
+                  <h2>Проверка источника и метода</h2>
+                </div>
+                <p class="panel-meta">Прозрачность расчёта прямо на главном экране.</p>
+              </div>
+
+              <div class="trust-grid">
+                <div class="trust-item">
+                  <span class="metric-label">Источник</span>
+                  <strong id="trust-source">Aladhan API</strong>
+                </div>
+                <div class="trust-item">
+                  <span class="metric-label">Метод</span>
+                  <strong id="trust-method">Метод ещё не выбран</strong>
+                </div>
+                <div class="trust-item">
+                  <span class="metric-label">Timezone</span>
+                  <strong id="trust-timezone">timezone не определён</strong>
+                </div>
+                <div class="trust-item">
+                  <span class="metric-label">Обновлено</span>
+                  <strong id="trust-updated">ещё не обновлялось</strong>
+                </div>
+              </div>
+
+              <p id="trust-disclaimer" class="trust-disclaimer">
+                Время рассчитано по выбранному методу и может отличаться от расписания местной мечети или духовного управления.
+              </p>
+            </article>
           </section>
 
           <section class="panel">
@@ -250,6 +289,42 @@
               <button id="notifications-button" type="button" class="secondary-button">
                 Включить уведомления
               </button>
+              <label class="field compact-field">
+                <span>За сколько напоминать</span>
+                <select id="notifications-lead-minutes">
+                  <option value="0">В момент начала</option>
+                  <option value="5">За 5 минут</option>
+                  <option value="10">За 10 минут</option>
+                  <option value="15">За 15 минут</option>
+                </select>
+              </label>
+              <fieldset class="notification-prayers">
+                <legend>Для каких намазов</legend>
+                <label class="check-chip">
+                  <input type="checkbox" name="notification-prayer" value="fajr" />
+                  <span>Фаджр</span>
+                </label>
+                <label class="check-chip">
+                  <input type="checkbox" name="notification-prayer" value="dhuhr" />
+                  <span>Зухр</span>
+                </label>
+                <label class="check-chip">
+                  <input type="checkbox" name="notification-prayer" value="asr" />
+                  <span>Аср</span>
+                </label>
+                <label class="check-chip">
+                  <input type="checkbox" name="notification-prayer" value="maghrib" />
+                  <span>Магриб</span>
+                </label>
+                <label class="check-chip">
+                  <input type="checkbox" name="notification-prayer" value="isha" />
+                  <span>Иша</span>
+                </label>
+              </fieldset>
+              <label class="toggle-row" for="notifications-current-city-only">
+                <input id="notifications-current-city-only" type="checkbox" checked />
+                <span>Только для текущего выбранного города</span>
+              </label>
               <p id="notifications-status" class="panel-meta">Разрешение пока не выдано.</p>
             </div>
           </div>

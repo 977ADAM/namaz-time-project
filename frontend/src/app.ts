@@ -13,17 +13,19 @@ import {
   renderMonthlyMeta,
   renderMonthlyTable,
   renderNotifications,
+  renderQuickPresets,
   renderSearchResults,
   renderTodayMeta,
   renderTodayTimings,
+  renderTrustLayer,
   setSearchStatus,
   setStatus,
   syncSettings,
 } from "./render";
 import { navigate, setRoute } from "./router";
 import { createAppState, type AppState } from "./state";
-import { saveFavoriteLocations, saveLocation, writeSetting } from "./storage";
-import type { LocationResult, PrayerMoment } from "./types";
+import { saveFavoriteLocations, saveLocation, saveQuickPresets, writeSetting } from "./storage";
+import type { LocationResult, NotifiablePrayerKey, PrayerMoment, QuickPreset } from "./types";
 
 export function initApp(): void {
   const state = createAppState();
@@ -69,8 +71,10 @@ function renderAll(state: AppState, elements: AppElements): void {
   renderMonthlyMeta(state, elements);
   renderMonthlyTable(state, elements);
   renderFavoriteCities(state, elements, async (location) => applyLocation(state, elements, location));
+  renderQuickPresets(state, elements, async (preset) => handleQuickPreset(state, elements, preset));
   renderFavoriteToggle(state, elements);
   renderNotifications(state, elements);
+  renderTrustLayer(state, elements);
   syncSettings(state, elements);
 }
 
@@ -168,6 +172,7 @@ async function loadPrayerData(state: AppState, elements: AppElements): Promise<v
   state.tomorrow = tomorrowPayload;
   state.monthly = monthlyPayload;
   state.location.timezone = todayPayload.location?.timezone || state.location.timezone;
+  state.lastUpdatedAt = new Date();
   saveLocation(state.location);
 
   renderAll(state, elements);
@@ -186,6 +191,25 @@ async function applyLocation(state: AppState, elements: AppElements, location: L
   syncSettings(state, elements);
   renderFavoriteToggle(state, elements);
   await loadPrayerData(state, elements);
+}
+
+async function handleQuickPreset(state: AppState, elements: AppElements, preset: QuickPreset): Promise<void> {
+  if (preset.location) {
+    await applyLocation(state, elements, preset.location);
+    setSearchStatus(elements, `Быстро переключились на пресет «${preset.label}».`);
+    return;
+  }
+
+  if (!preset.assignable) {
+    return;
+  }
+
+  state.quickPresets = state.quickPresets.map((item) =>
+    item.id === preset.id ? { ...item, location: { ...state.location } } : item
+  );
+  saveQuickPresets(state.quickPresets);
+  renderQuickPresets(state, elements, async (item) => handleQuickPreset(state, elements, item));
+  setSearchStatus(elements, `Текущий город сохранён в пресет «${preset.label}».`);
 }
 
 async function handleSearch(state: AppState, elements: AppElements, query: string): Promise<void> {
@@ -265,6 +289,13 @@ function toggleFavorite(state: AppState, elements: AppElements): void {
   renderFavoriteToggle(state, elements);
 }
 
+function getSelectedNotificationPrayers(elements: AppElements): NotifiablePrayerKey[] {
+  const values = elements.notificationPrayerCheckboxes
+    .filter((checkbox) => checkbox.checked)
+    .map((checkbox) => checkbox.value as NotifiablePrayerKey);
+  return values.length ? values : ["fajr", "maghrib"];
+}
+
 function buildLiveStatus(current: PrayerMoment | null, next: PrayerMoment | null, totalSeconds: number): string {
   if (!current && next) {
     return `До первого намаза сегодня осталось ${Math.ceil(totalSeconds / 60)} мин.`;
@@ -293,23 +324,54 @@ function calculateProgressPercent(current: PrayerMoment | null, next: PrayerMome
 }
 
 function maybeSendPrayerNotification(state: AppState, current: PrayerMoment | null): void {
-  if (!state.notificationsEnabled || !current || !("Notification" in window) || Notification.permission !== "granted") {
+  if (
+    !state.notificationsEnabled ||
+    !("Notification" in window) ||
+    Notification.permission !== "granted" ||
+    !state.today
+  ) {
     return;
   }
 
-  const notificationKey = `${current.key}-${current.date}`;
-  if (!state.lastCurrentPrayerKey) {
-    state.lastCurrentPrayerKey = notificationKey;
+  const locationKey = state.notificationCurrentCityOnly ? state.location.id : "global";
+
+  if (current && state.notificationPrayerKeys.includes(current.key as NotifiablePrayerKey)) {
+    const notificationKey = `${locationKey}:start:${current.key}:${current.date}`;
+    if (!state.lastCurrentPrayerKey) {
+      state.lastCurrentPrayerKey = notificationKey;
+    }
+
+    if (!state.sentNotificationKeys.has(notificationKey)) {
+      state.sentNotificationKeys.add(notificationKey);
+      state.lastCurrentPrayerKey = notificationKey;
+      new Notification("Namaz Time", {
+        body: `Наступило время намаза ${current.label} в ${state.location.city}.`,
+        tag: notificationKey,
+      });
+    }
+  }
+
+  const next = state.liveNextPrayer;
+  if (!next || !state.notificationPrayerKeys.includes(next.key as NotifiablePrayerKey)) {
     return;
   }
 
-  if (state.lastCurrentPrayerKey === notificationKey) {
+  const diffSeconds = Math.floor((next.datetime.getTime() - Date.now()) / 1000);
+  const leadSeconds = state.notificationLeadMinutes * 60;
+  if (diffSeconds <= 0 || leadSeconds <= 0 || diffSeconds > leadSeconds) {
     return;
   }
 
-  state.lastCurrentPrayerKey = notificationKey;
-  const body = `Наступило время намаза ${current.label}.`;
-  new Notification("Namaz Time", { body, tag: notificationKey });
+  const reminderKey = `${locationKey}:lead:${next.key}:${next.date}:${state.notificationLeadMinutes}`;
+  if (state.sentNotificationKeys.has(reminderKey)) {
+    return;
+  }
+
+  state.sentNotificationKeys.add(reminderKey);
+  new Notification("Namaz Time", {
+    body: `До ${next.label} в ${state.location.city} осталось ${state.notificationLeadMinutes} мин.`,
+    tag: reminderKey,
+  });
 }
 
 function applyAtmosphere(current: PrayerMoment | null, next: PrayerMoment | null): void {
@@ -424,6 +486,26 @@ function bindEvents(state: AppState, elements: AppElements): void {
 
   elements.notificationButton.addEventListener("click", () => {
     void enableNotifications(state, elements);
+  });
+
+  elements.notificationLeadMinutes.addEventListener("change", (event) => {
+    state.notificationLeadMinutes = Number((event.target as HTMLSelectElement).value);
+    writeSetting(STORAGE_KEYS.notificationLeadMinutes, String(state.notificationLeadMinutes));
+    renderNotifications(state, elements);
+  });
+
+  elements.notificationCurrentCityOnly.addEventListener("change", (event) => {
+    state.notificationCurrentCityOnly = (event.target as HTMLInputElement).checked;
+    writeSetting(STORAGE_KEYS.notificationCurrentCityOnly, String(state.notificationCurrentCityOnly));
+    renderNotifications(state, elements);
+  });
+
+  elements.notificationPrayerCheckboxes.forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      state.notificationPrayerKeys = getSelectedNotificationPrayers(elements);
+      writeSetting(STORAGE_KEYS.notificationPrayerKeys, state.notificationPrayerKeys.join(","));
+      renderNotifications(state, elements);
+    });
   });
 
   elements.navLinks.forEach((link) => {

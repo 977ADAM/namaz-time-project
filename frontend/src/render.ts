@@ -2,7 +2,7 @@ import { PRAYER_LABELS, WEEKDAYS } from "./constants";
 import type { AppElements } from "./dom";
 import { formatMonthYear, formatTime } from "./formatters";
 import type { AppState } from "./state";
-import type { LocationResult, PrayerMoment } from "./types";
+import type { LocationResult, NotifiablePrayerKey, PrayerMoment, QuickPreset } from "./types";
 
 export function setStatus(elements: AppElements, message: string): void {
   elements.status.textContent = message;
@@ -151,6 +151,34 @@ export function renderFavoriteToggle(state: AppState, elements: AppElements): vo
   elements.favoriteToggleButton.textContent = isFavorite ? "Убрать из избранного" : "В избранное";
 }
 
+export function renderQuickPresets(
+  state: AppState,
+  elements: AppElements,
+  onSelect: (preset: QuickPreset) => void | Promise<void>
+): void {
+  elements.quickPresetsList.innerHTML = "";
+  state.quickPresets.forEach((preset) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "preset-card";
+    if (preset.location?.id === state.location.id) {
+      button.classList.add("preset-card-active");
+    }
+    if (!preset.location) {
+      button.classList.add("preset-card-empty");
+    }
+    button.innerHTML = `
+      <span class="preset-label">${preset.label}</span>
+      <strong class="preset-title">${preset.location?.city || "Сохранить текущий"}</strong>
+      <small class="preset-meta">${preset.location?.country || "Нажмите, чтобы привязать активный город"}</small>
+    `;
+    button.addEventListener("click", () => {
+      void onSelect(preset);
+    });
+    elements.quickPresetsList.appendChild(button);
+  });
+}
+
 export function renderHeroState(
   state: AppState,
   elements: AppElements,
@@ -184,7 +212,35 @@ export function renderNotifications(state: AppState, elements: AppElements): voi
         : permission === "unsupported"
           ? "Этот браузер не поддерживает уведомления."
           : "Разрешение пока не выдано.";
-  elements.notificationStatus.textContent = permissionText;
+  const selectedPrayers = state.notificationPrayerKeys.map((key) => PRAYER_LABELS[key]).join(", ");
+  const leadText = state.notificationLeadMinutes > 0 ? `за ${state.notificationLeadMinutes} мин.` : "в момент начала";
+  elements.notificationStatus.textContent = `${permissionText} Сценарий: ${selectedPrayers}, ${leadText}.`;
+  elements.notificationLeadMinutes.value = String(state.notificationLeadMinutes);
+  elements.notificationCurrentCityOnly.checked = state.notificationCurrentCityOnly;
+  elements.notificationPrayerCheckboxes.forEach((checkbox) => {
+    checkbox.checked = state.notificationPrayerKeys.includes(checkbox.value as NotifiablePrayerKey);
+  });
+}
+
+export function renderTrustLayer(state: AppState, elements: AppElements): void {
+  const methodName = state.today?.method?.name || "Метод ещё не выбран";
+  const timezone = state.today?.location?.timezone || state.location.timezone || "timezone не определён";
+  const updatedAt = state.lastUpdatedAt
+    ? new Intl.DateTimeFormat("ru-RU", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        day: "2-digit",
+        month: "long",
+      }).format(state.lastUpdatedAt)
+    : "ещё не обновлялось";
+
+  elements.trustMethod.textContent = methodName;
+  elements.trustTimezone.textContent = timezone;
+  elements.trustSource.textContent = "Aladhan API";
+  elements.trustUpdated.textContent = updatedAt;
+  elements.trustDisclaimer.textContent =
+    "Время рассчитано по выбранному методу и может отличаться от расписания местной мечети или духовного управления.";
 }
 
 export function syncSettings(state: AppState, elements: AppElements): void {
