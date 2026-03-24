@@ -33,6 +33,10 @@ class Settings:
     prayer_api_base_url: str = os.getenv("PRAYER_API_BASE_URL", "https://api.aladhan.com/v1/timings")
     prayer_api_timeout_seconds: int = _get_int("PRAYER_API_TIMEOUT_SECONDS", 15)
     cache_ttl_seconds: int = _get_int("CACHE_TTL_SECONDS", 300)
+    rate_limit_enabled: bool = _get_bool("RATE_LIMIT_ENABLED", True)
+    rate_limit_requests: int = _get_int("RATE_LIMIT_REQUESTS", 120)
+    rate_limit_window_seconds: int = _get_int("RATE_LIMIT_WINDOW_SECONDS", 60)
+    security_headers_enabled: bool = _get_bool("SECURITY_HEADERS_ENABLED", True)
     cors_allow_origins: list[str] = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:

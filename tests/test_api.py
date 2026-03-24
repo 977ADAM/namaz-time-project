@@ -19,7 +19,7 @@ from app.schemas import (
 
 class ApiTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
         self.client = httpx.AsyncClient(transport=transport, base_url="http://testserver")
 
     async def asyncTearDown(self):
@@ -44,6 +44,15 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["openapi_url"], "/openapi.json")
+
+    async def test_metrics_endpoint(self):
+        response = await self.client.get("/metrics")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn("cache", body)
+        self.assertIn("rate_limit", body)
+        self.assertIn("enabled", body["rate_limit"])
 
     async def test_root_serves_frontend(self):
         response = await self.client.get("/")
@@ -270,3 +279,25 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(len(response.json()["methods"]) >= 7)
+        self.assertIn("X-RateLimit-Remaining", response.headers)
+        self.assertIn("X-RateLimit-Reset", response.headers)
+
+    async def test_rate_limit_returns_429(self):
+        with patch("app.main.rate_limiter.check") as mocked_check:
+            from app.rate_limit import RateLimitResult
+
+            mocked_check.return_value = RateLimitResult(allowed=False, remaining=0, reset_after_seconds=7)
+            response = await self.client.get("/api/v1/config/methods")
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.json()["error"]["code"], "RATE_LIMITED")
+        self.assertEqual(response.headers["Retry-After"], "7")
+
+    async def test_unhandled_exception_returns_internal_error(self):
+        with patch("app.main.service.search_locations", AsyncMock(side_effect=Exception("boom"))):
+            response = await self.client.get("/api/v1/cities/search", params={"q": "Moscow"})
+
+        self.assertEqual(response.status_code, 500)
+        body = response.json()
+        self.assertEqual(body["error"]["code"], "INTERNAL_ERROR")
+        self.assertIn("request_id", body["error"]["details"])

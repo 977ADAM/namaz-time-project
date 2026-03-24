@@ -20,6 +20,9 @@ Production-ready веб-сервис для отображения времен 
 - адаптивный интерфейс для mobile/tablet/desktop
 - унифицированные API-ошибки
 - in-memory cache для daily/monthly/timezone lookup
+- in-memory rate limiting для публичных API
+- request id и базовые security headers
+- JSON metrics endpoint для cache/rate-limit observability
 
 ## Архитектура
 
@@ -36,6 +39,9 @@ Backend отвечает за:
 - унификацию ошибок
 - кэширование популярных запросов
 - сокрытие внешних интеграций от клиента
+- базовую защиту от всплесков запросов через rate limiting
+- безопасную обработку неожиданных исключений
+- базовую операционную наблюдаемость через `/health`, `/ready`, `/metrics`
 
 ## Маршруты UI
 
@@ -53,6 +59,7 @@ Backend отвечает за:
 - `GET /api/v1/cities/search`
 - `GET /api/v1/location/reverse`
 - `GET /api/v1/config/methods`
+- `GET /metrics`
 
 ### Совместимость со старыми endpoints
 
@@ -187,6 +194,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 8080 --reload
 - Settings: `http://127.0.0.1:8080/settings`
 - About: `http://127.0.0.1:8080/about`
 - Swagger: `http://127.0.0.1:8080/docs`
+- Metrics: `http://127.0.0.1:8080/metrics`
 
 ## Разработка frontend
 
@@ -228,6 +236,10 @@ docker compose down
 - `PRAYER_API_BASE_URL`
 - `PRAYER_API_TIMEOUT_SECONDS`
 - `CACHE_TTL_SECONDS`
+- `RATE_LIMIT_ENABLED`
+- `RATE_LIMIT_REQUESTS`
+- `RATE_LIMIT_WINDOW_SECONDS`
+- `SECURITY_HEADERS_ENABLED`
 - `CORS_ALLOW_ORIGINS`
 - `HOST`
 - `PORT`

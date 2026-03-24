@@ -57,6 +57,16 @@ class PrayerTimesService:
         self._calendar_cache: dict[tuple[float, float, int, int, int, int], tuple[float, PrayerCalendarResponse]] = {}
         self._timezone_cache: dict[tuple[float, float], tuple[float, str]] = {}
         self._location_cache: dict[tuple[float, float], tuple[float, LocationResult]] = {}
+        self._stats: dict[str, int] = {
+            "daily_cache_hits": 0,
+            "daily_cache_misses": 0,
+            "calendar_cache_hits": 0,
+            "calendar_cache_misses": 0,
+            "timezone_cache_hits": 0,
+            "timezone_cache_misses": 0,
+            "location_cache_hits": 0,
+            "location_cache_misses": 0,
+        }
 
     async def get_prayer_times(self, request: PrayerRequest) -> PrayerTimesResponse:
         self._validate_method(request.method)
@@ -65,8 +75,10 @@ class PrayerTimesService:
         cache_key = self._build_cache_key(request)
         cached = self._get_cached(cache_key)
         if cached is not None:
+            self._stats["daily_cache_hits"] += 1
             logger.debug("Serving prayer times from cache", extra={"cache_key": cache_key})
             return cached
+        self._stats["daily_cache_misses"] += 1
 
         payload = await self._fetch_timings(request)
         result = self._map_payload(request, payload)
@@ -89,7 +101,9 @@ class PrayerTimesService:
         cache_key = (round(latitude, 4), round(longitude, 4), method, school, year, month)
         cached = self._get_calendar_cached(cache_key)
         if cached is not None:
+            self._stats["calendar_cache_hits"] += 1
             return cached
+        self._stats["calendar_cache_misses"] += 1
 
         payload = await self._fetch_calendar(
             latitude=latitude,
@@ -131,8 +145,10 @@ class PrayerTimesService:
         if cached is not None:
             expires_at, result = cached
             if expires_at > monotonic():
+                self._stats["location_cache_hits"] += 1
                 return result.model_copy(deep=True)
             self._location_cache.pop(cache_key, None)
+        self._stats["location_cache_misses"] += 1
 
         client = await self._get_client()
         try:
@@ -201,6 +217,9 @@ class PrayerTimesService:
         except RuntimeError:
             return False
         return True
+
+    def get_stats(self) -> dict[str, int]:
+        return self._stats.copy()
 
     async def close(self) -> None:
         if self._client is not None:
@@ -469,8 +488,10 @@ class PrayerTimesService:
         if cached is not None:
             expires_at, timezone = cached
             if expires_at > monotonic():
+                self._stats["timezone_cache_hits"] += 1
                 return timezone
             self._timezone_cache.pop(cache_key, None)
+        self._stats["timezone_cache_misses"] += 1
 
         request = build_prayer_request(
             latitude=latitude,

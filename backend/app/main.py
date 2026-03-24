@@ -1,5 +1,6 @@
 import logging
 import time
+import uuid
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
@@ -10,6 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
+from app.rate_limit import InMemoryRateLimiter
 from app.schemas import (
     ApiErrorBody,
     ApiErrorResponse,
@@ -20,6 +22,7 @@ from app.schemas import (
     ErrorResponse,
     HealthResponse,
     LocationSearchResponse,
+    MetricsResponse,
     MethodsResponse,
     PrayerCalendarResponse,
     PrayerTimesResponse,
@@ -34,6 +37,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 service = PrayerTimesService()
+rate_limiter = InMemoryRateLimiter(
+    requests=settings.rate_limit_requests,
+    window_seconds=settings.rate_limit_window_seconds,
+)
 ROOT_DIR = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = ROOT_DIR / "frontend"
 DIST_DIR = FRONTEND_DIR / "dist"
@@ -75,6 +82,20 @@ def map_runtime_error(exc: RuntimeError) -> tuple[int, str]:
     return 502, "UPSTREAM_BAD_RESPONSE"
 
 
+def get_client_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    if request.client:
+        return request.client.host
+    return "unknown"
+
+
+def is_rate_limited_path(path: str) -> bool:
+    exempt_prefixes = ("/health", "/ready", "/docs", "/openapi.json", "/assets", "/favicon.ico")
+    return not path.startswith(exempt_prefixes)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allow_origins,
@@ -92,10 +113,48 @@ elif STATIC_DIR.exists():
 @app.middleware("http")
 async def add_request_timing(request: Request, call_next):
     started_at = time.perf_counter()
+    request_id = request.headers.get("x-request-id", str(uuid.uuid4()))
+    request.state.request_id = request_id
+
+    if settings.rate_limit_enabled and is_rate_limited_path(request.url.path):
+        client_ip = get_client_ip(request)
+        result = rate_limiter.check(f"{client_ip}:{request.url.path}")
+        request.state.rate_limit_result = result
+        if not result.allowed:
+            logger.warning("Rate limit exceeded", extra={"client_ip": client_ip, "path": request.url.path})
+            response = JSONResponse(
+                status_code=429,
+                content=api_error(
+                    "RATE_LIMITED",
+                    "Too many requests. Please try again later.",
+                    {"retry_after_seconds": result.reset_after_seconds},
+                ),
+            )
+            response.headers["Retry-After"] = str(result.reset_after_seconds)
+            response.headers["X-RateLimit-Remaining"] = "0"
+            response.headers["X-Request-Id"] = request_id
+            return response
+
     response = await call_next(request)
     duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
     response.headers["X-Process-Time-Ms"] = str(duration_ms)
-    logger.info("%s %s -> %s in %sms", request.method, request.url.path, response.status_code, duration_ms)
+    response.headers["X-Request-Id"] = request_id
+    rate_limit_result = getattr(request.state, "rate_limit_result", None)
+    if rate_limit_result is not None:
+        response.headers["X-RateLimit-Remaining"] = str(rate_limit_result.remaining)
+        response.headers["X-RateLimit-Reset"] = str(rate_limit_result.reset_after_seconds)
+    if settings.security_headers_enabled:
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    logger.info(
+        "%s %s -> %s in %sms",
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+        extra={"request_id": request_id},
+    )
     return response
 
 
@@ -116,6 +175,19 @@ async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse
     return JSONResponse(status_code=exc.status_code, content=api_error(code, str(exc.detail)))
 
 
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled exception for request", extra={"path": request.url.path})
+    return JSONResponse(
+        status_code=500,
+        content=api_error(
+            "INTERNAL_ERROR",
+            "An unexpected internal error occurred.",
+            {"request_id": getattr(request.state, "request_id", None)},
+        ),
+    )
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
     return HealthResponse(status="ok")
@@ -125,7 +197,12 @@ async def health() -> HealthResponse:
 async def ready() -> ReadinessResponse:
     upstream_status = "ok" if await service.check_ready() else "degraded"
     status = "ok" if upstream_status == "ok" else "degraded"
-    return ReadinessResponse(status=status, checks={"app": "ok", "upstream_client": upstream_status})
+    checks = {
+        "app": "ok",
+        "upstream_client": upstream_status,
+        "rate_limiter": "ok" if settings.rate_limit_enabled else "disabled",
+    }
+    return ReadinessResponse(status=status, checks=checks)
 
 
 @app.get("/v1/meta", response_model=AppMetaResponse)
@@ -136,6 +213,20 @@ async def app_meta() -> AppMetaResponse:
         environment=settings.environment,
         docs_url="/docs",
         openapi_url="/openapi.json",
+    )
+
+
+@app.get("/metrics", response_model=MetricsResponse)
+async def metrics() -> MetricsResponse:
+    return MetricsResponse(
+        environment=settings.environment,
+        version=settings.app_version,
+        cache=service.get_stats(),
+        rate_limit=(
+            {"enabled": "true", **rate_limiter.get_stats()}
+            if settings.rate_limit_enabled
+            else {"enabled": "false"}
+        ),
     )
 
 

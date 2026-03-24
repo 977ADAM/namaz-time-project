@@ -173,3 +173,10 @@ class AppMetaResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str = Field(..., description="Human-readable error message")
+
+
+class MetricsResponse(BaseModel):
+    environment: str
+    version: str
+    cache: dict[str, int]
+    rate_limit: dict[str, int | str]
