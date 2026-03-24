@@ -8,6 +8,7 @@ export interface AppElements {
   favoritesList: HTMLDivElement;
   favoriteToggleButton: HTMLButtonElement;
   quickPresetsList: HTMLDivElement;
+  mobileChangeCityButton: HTMLButtonElement;
   status: HTMLParagraphElement;
   heroPrayerCard: HTMLElement;
   heroPrayerName: HTMLElement;
@@ -44,6 +45,9 @@ export interface AppElements {
   notificationLeadMinutes: HTMLSelectElement;
   notificationCurrentCityOnly: HTMLInputElement;
   notificationPrayerCheckboxes: HTMLInputElement[];
+  installAppButton: HTMLButtonElement;
+  installAppStatus: HTMLParagraphElement;
+  compareList: HTMLDivElement;
   trustMethod: HTMLElement;
   trustTimezone: HTMLElement;
   trustSource: HTMLElement;
@@ -72,6 +76,7 @@ export function getElements(): AppElements {
     favoritesList: queryRequired<HTMLDivElement>("#favorites-list"),
     favoriteToggleButton: queryRequired<HTMLButtonElement>("#favorite-toggle-button"),
     quickPresetsList: queryRequired<HTMLDivElement>("#quick-presets-list"),
+    mobileChangeCityButton: queryRequired<HTMLButtonElement>("#mobile-change-city-button"),
     status: queryRequired<HTMLParagraphElement>("#status"),
     heroPrayerCard: queryRequired<HTMLElement>("#hero-prayer-card"),
     heroPrayerName: queryRequired<HTMLElement>("#hero-prayer-name"),
@@ -110,6 +115,9 @@ export function getElements(): AppElements {
     notificationPrayerCheckboxes: Array.from(
       document.querySelectorAll<HTMLInputElement>('input[name="notification-prayer"]')
     ),
+    installAppButton: queryRequired<HTMLButtonElement>("#install-app-button"),
+    installAppStatus: queryRequired<HTMLParagraphElement>("#install-app-status"),
+    compareList: queryRequired<HTMLDivElement>("#compare-list"),
     trustMethod: queryRequired("#trust-method"),
     trustTimezone: queryRequired("#trust-timezone"),
     trustSource: queryRequired("#trust-source"),

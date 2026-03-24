@@ -14,6 +14,9 @@
       content="Быстрый и удобный сайт с временами намаза, определением города, таймером и расписанием на месяц."
     />
     <meta property="og:type" content="website" />
+    <meta name="theme-color" content="#0f766e" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon-192.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -36,18 +39,18 @@
         </a>
 
         <nav class="main-nav" aria-label="Основная навигация">
-          <a href="/" data-nav>Сегодня</a>
-          <a href="/monthly" data-nav>Месяц</a>
-          <a href="/settings" data-nav>Настройки</a>
-          <a href="/about" data-nav>О проекте</a>
+          <a href="/" data-nav data-i18n="nav.today">Сегодня</a>
+          <a href="/monthly" data-nav data-i18n="nav.monthly">Месяц</a>
+          <a href="/settings" data-nav data-i18n="nav.settings">Настройки</a>
+          <a href="/about" data-nav data-i18n="nav.about">О проекте</a>
         </nav>
       </header>
 
       <section class="hero-panel">
         <div class="hero-copy">
-          <p class="eyebrow">Production-ready prayer times</p>
-          <h1>Актуальные времена намаза для вашего города.</h1>
-          <p class="hero-text">
+          <p class="eyebrow" data-i18n="hero.eyebrow">Production-ready prayer times</p>
+          <h1 data-i18n="hero.title">Актуальные времена намаза для вашего города.</h1>
+          <p class="hero-text" data-i18n="hero.text">
             Определяйте местоположение автоматически или выбирайте город вручную, чтобы увидеть
             расписание на сегодня, следующий намаз и календарь на месяц.
           </p>
@@ -55,27 +58,28 @@
 
         <aside class="search-panel">
           <form id="city-form" class="city-form">
-            <label for="city-query">Город</label>
+            <label for="city-query" data-i18n="search.city">Город</label>
             <div class="search-row">
               <input
                 id="city-query"
                 type="text"
                 placeholder="Например, Tashkent, Kazan, Istanbul"
+                data-i18n-placeholder="search.placeholder"
                 autocomplete="off"
               />
-              <button id="search-button" type="submit">Найти</button>
+              <button id="search-button" type="submit" data-i18n="search.button">Найти</button>
             </div>
           </form>
 
           <div class="toolbar">
-            <button id="locate-button" type="button" class="secondary-button">
+            <button id="locate-button" type="button" class="secondary-button" data-i18n="search.locate">
               Определить местоположение
             </button>
-            <button id="retry-button" type="button" class="ghost-button">Повторить загрузку</button>
+            <button id="retry-button" type="button" class="ghost-button" data-i18n="search.retry">Повторить загрузку</button>
           </div>
 
           <div class="favorites-head">
-            <span class="metric-label">Избранные города</span>
+            <span class="metric-label" data-i18n="favorites.title">Избранные города</span>
             <button id="favorite-toggle-button" type="button" class="ghost-button compact-button">
               В избранное
             </button>
@@ -83,8 +87,8 @@
           <div id="favorites-list" class="favorites-list" aria-live="polite"></div>
 
           <div class="favorites-head quick-presets-head">
-            <span class="metric-label">Быстрые пресеты</span>
-            <span class="panel-meta compact-meta">Дом, Работа, Мекка, Ташкент</span>
+            <span class="metric-label" data-i18n="presets.title">Быстрые пресеты</span>
+            <span class="panel-meta compact-meta" data-i18n="presets.meta">Дом, Работа, Путешествие</span>
           </div>
           <div id="quick-presets-list" class="quick-presets-list" aria-live="polite"></div>
 
@@ -98,22 +102,26 @@
           <section class="panel summary-panel">
             <div class="panel-head">
               <div>
-                <p class="eyebrow">Сегодня</p>
-                <h2 id="today-title">Выберите город</h2>
+                <p class="eyebrow" data-i18n="today.eyebrow">Сегодня</p>
+                <h2 id="today-title" data-i18n="today.emptyTitle">Выберите город</h2>
               </div>
-              <p id="today-meta" class="panel-meta">После выбора локации покажем актуальные данные.</p>
+              <p id="today-meta" class="panel-meta" data-i18n="today.emptyMeta">После выбора локации покажем актуальные данные.</p>
             </div>
+
+            <button id="mobile-change-city-button" type="button" class="secondary-button mobile-change-city-button" data-i18n="search.city">
+              Город
+            </button>
 
             <article id="hero-prayer-card" class="hero-prayer-card">
               <div class="hero-prayer-top">
                 <div>
-                  <span class="metric-label">Ближайший намаз</span>
+                  <span class="metric-label" data-i18n="hero.card.label">Ближайший намаз</span>
                   <strong id="hero-prayer-name" class="hero-prayer-name">Нет данных</strong>
                 </div>
-                <span id="hero-prayer-time" class="hero-prayer-time">Выберите город</span>
+                <span id="hero-prayer-time" class="hero-prayer-time" data-i18n="hero.card.emptyTime">Выберите город</span>
               </div>
               <div id="hero-countdown" class="hero-countdown">--:--:--</div>
-              <p id="hero-status" class="hero-status">После загрузки покажем живой статус времени намаза.</p>
+              <p id="hero-status" class="hero-status" data-i18n="hero.card.emptyStatus">После загрузки покажем живой статус времени намаза.</p>
               <div class="hero-progress-track" aria-hidden="true">
                 <div id="hero-progress-bar" class="hero-progress-bar"></div>
               </div>
@@ -121,22 +129,22 @@
 
             <div class="summary-grid">
               <article class="metric-card accent">
-                <span class="metric-label">Следующий намаз</span>
+                <span class="metric-label" data-i18n="metric.next">Следующий намаз</span>
                 <strong id="next-prayer-name">Нет данных</strong>
                 <span id="next-prayer-time" class="metric-meta">Выберите город</span>
               </article>
               <article class="metric-card">
-                <span class="metric-label">Текущий намаз</span>
+                <span class="metric-label" data-i18n="metric.current">Текущий намаз</span>
                 <strong id="current-prayer-name">Нет данных</strong>
                 <span id="current-prayer-time" class="metric-meta">Ожидаем загрузку</span>
               </article>
               <article class="metric-card">
-                <span class="metric-label">Таймер</span>
+                <span class="metric-label" data-i18n="metric.timer">Таймер</span>
                 <strong id="countdown-value">--:--:--</strong>
                 <span id="countdown-meta" class="metric-meta">До следующего намаза</span>
               </article>
               <article class="metric-card">
-                <span class="metric-label">Локация</span>
+                <span class="metric-label" data-i18n="metric.location">Локация</span>
                 <strong id="location-name">Не выбрана</strong>
                 <span id="location-meta" class="metric-meta">Координаты и часовой пояс появятся после поиска</span>
               </article>
@@ -144,11 +152,11 @@
 
             <div class="dates-row">
               <div class="date-card">
-                <span class="metric-label">Григорианская дата</span>
+                <span class="metric-label" data-i18n="date.gregorian">Григорианская дата</span>
                 <strong id="gregorian-date">--</strong>
               </div>
               <div class="date-card">
-                <span class="metric-label">Исламская дата</span>
+                <span class="metric-label" data-i18n="date.hijri">Исламская дата</span>
                 <strong id="hijri-date">--</strong>
               </div>
             </div>
@@ -156,27 +164,27 @@
             <article class="trust-card" aria-live="polite">
               <div class="panel-head trust-head">
                 <div>
-                  <p class="eyebrow">Trust Layer</p>
-                  <h2>Проверка источника и метода</h2>
+                  <p class="eyebrow" data-i18n="trust.eyebrow">Trust Layer</p>
+                  <h2 data-i18n="trust.title">Проверка источника и метода</h2>
                 </div>
-                <p class="panel-meta">Прозрачность расчёта прямо на главном экране.</p>
+                <p class="panel-meta" data-i18n="trust.meta">Прозрачность расчёта прямо на главном экране.</p>
               </div>
 
               <div class="trust-grid">
                 <div class="trust-item">
-                  <span class="metric-label">Источник</span>
+                  <span class="metric-label" data-i18n="trust.source">Источник</span>
                   <strong id="trust-source">Aladhan API</strong>
                 </div>
                 <div class="trust-item">
-                  <span class="metric-label">Метод</span>
+                  <span class="metric-label" data-i18n="trust.method">Метод</span>
                   <strong id="trust-method">Метод ещё не выбран</strong>
                 </div>
                 <div class="trust-item">
-                  <span class="metric-label">Timezone</span>
+                  <span class="metric-label" data-i18n="trust.timezone">Timezone</span>
                   <strong id="trust-timezone">timezone не определён</strong>
                 </div>
                 <div class="trust-item">
-                  <span class="metric-label">Обновлено</span>
+                  <span class="metric-label" data-i18n="trust.updated">Обновлено</span>
                   <strong id="trust-updated">ещё не обновлялось</strong>
                 </div>
               </div>
@@ -190,30 +198,41 @@
           <section class="panel">
             <div class="panel-head">
               <div>
-                <p class="eyebrow">Сегодняшнее расписание</p>
-                <h2>Времена намаза</h2>
+                <p class="eyebrow" data-i18n="schedule.eyebrow">Сегодняшнее расписание</p>
+                <h2 data-i18n="schedule.title">Времена намаза</h2>
               </div>
               <p id="status" class="panel-meta">Готово к работе.</p>
             </div>
             <div id="today-times" class="timings-grid" aria-live="polite"></div>
           </section>
         </div>
+
+        <section class="panel compare-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow" data-i18n="compare.eyebrow">Multi-city mode</p>
+              <h2 data-i18n="compare.title">Дом, Работа, Путешествие</h2>
+            </div>
+            <p class="panel-meta" data-i18n="compare.meta">Сравните следующий намаз в ваших основных сценариях.</p>
+          </div>
+          <div id="compare-list" class="compare-list" aria-live="polite"></div>
+        </section>
       </section>
 
       <section id="route-monthly" class="route-section">
         <section class="panel">
           <div class="panel-head">
             <div>
-              <p class="eyebrow">Monthly</p>
-              <h2 id="monthly-title">Расписание на месяц</h2>
+              <p class="eyebrow" data-i18n="monthly.eyebrow">Monthly</p>
+              <h2 id="monthly-title" data-i18n="monthly.title">Расписание на месяц</h2>
             </div>
             <p id="monthly-meta" class="panel-meta">Выберите город, чтобы открыть календарь.</p>
           </div>
 
           <div class="month-toolbar">
-            <button id="prev-month-button" type="button" class="ghost-button">Предыдущий месяц</button>
+            <button id="prev-month-button" type="button" class="ghost-button" data-i18n="monthly.prev">Предыдущий месяц</button>
             <div class="month-current" id="month-current-label">Текущий месяц</div>
-            <button id="next-month-button" type="button" class="ghost-button">Следующий месяц</button>
+            <button id="next-month-button" type="button" class="ghost-button" data-i18n="monthly.next">Следующий месяц</button>
           </div>
 
           <div class="table-wrap">
@@ -245,61 +264,72 @@
         <section class="panel">
           <div class="panel-head">
             <div>
-              <p class="eyebrow">Настройки</p>
-              <h2>Параметры отображения</h2>
+              <p class="eyebrow" data-i18n="settings.eyebrow">Настройки</p>
+              <h2 data-i18n="settings.title">Параметры отображения</h2>
             </div>
-            <p class="panel-meta">Изменения применяются сразу и сохраняются на устройстве.</p>
+            <p class="panel-meta" data-i18n="settings.meta">Изменения применяются сразу и сохраняются на устройстве.</p>
           </div>
 
           <div class="settings-grid">
             <label class="field">
-              <span>Метод расчёта</span>
+              <span data-i18n="settings.method">Метод расчёта</span>
               <select id="settings-method"></select>
             </label>
             <label class="field">
-              <span>Школа для Асра</span>
+              <span data-i18n="settings.school">Школа для Асра</span>
               <select id="settings-school">
                 <option value="0">Standard</option>
                 <option value="1">Hanafi</option>
               </select>
             </label>
             <label class="field">
-              <span>Язык интерфейса</span>
+              <span data-i18n="settings.language">Язык интерфейса</span>
               <select id="settings-language">
                 <option value="ru">Русский</option>
+                <option value="en">English</option>
+                <option value="uz">O'zbekcha</option>
+                <option value="ar">العربية</option>
               </select>
             </label>
             <label class="field">
-              <span>Тема</span>
+              <span data-i18n="settings.theme">Тема</span>
               <select id="settings-theme">
-                <option value="system">Системная</option>
-                <option value="light">Светлая</option>
-                <option value="dark">Тёмная</option>
+                <option value="system" data-i18n="settings.theme.system">Системная</option>
+                <option value="light" data-i18n="settings.theme.light">Светлая</option>
+                <option value="dark" data-i18n="settings.theme.dark">Тёмная</option>
               </select>
             </label>
             <label class="field">
-              <span>Формат времени</span>
+              <span data-i18n="settings.timeFormat">Формат времени</span>
               <select id="settings-time-format">
-                <option value="24h">24 часа</option>
-                <option value="12h">12 часов</option>
+                <option value="24h" data-i18n="settings.timeFormat.24h">24 часа</option>
+                <option value="12h" data-i18n="settings.timeFormat.12h">12 часов</option>
               </select>
             </label>
+            <div class="field install-field">
+              <span data-i18n="settings.install">Установить приложение</span>
+              <button id="install-app-button" type="button" class="ghost-button" data-i18n="settings.installButton">
+                Установить Namaz Time
+              </button>
+              <p class="panel-meta" data-i18n="settings.installHint">Добавьте Namaz Time на главный экран для быстрого доступа и PWA-режима.</p>
+              <p id="install-app-status" class="panel-meta">Установка уже выполнена или пока недоступна.</p>
+            </div>
             <div class="field notifications-field">
-              <span>Уведомления</span>
-              <button id="notifications-button" type="button" class="secondary-button">
+              <span data-i18n="settings.notifications">Уведомления</span>
+              <button id="notifications-button" type="button" class="secondary-button" data-i18n="settings.notificationsButton">
                 Включить уведомления
               </button>
               <label class="field compact-field">
-                <span>За сколько напоминать</span>
+                <span data-i18n="settings.notificationsLead">За сколько напоминать</span>
                 <select id="notifications-lead-minutes">
-                  <option value="0">В момент начала</option>
-                  <option value="5">За 5 минут</option>
-                  <option value="10">За 10 минут</option>
-                  <option value="15">За 15 минут</option>
+                  <option value="0" data-i18n="settings.notificationsAtStart">В момент начала</option>
+                  <option value="5" data-i18n="settings.notifications5">За 5 минут</option>
+                  <option value="10" data-i18n="settings.notifications10">За 10 минут</option>
+                  <option value="15" data-i18n="settings.notifications15">За 15 минут</option>
                 </select>
               </label>
               <fieldset class="notification-prayers">
-                <legend>Для каких намазов</legend>
+                <legend data-i18n="settings.notificationsFor">Для каких намазов</legend>
                 <label class="check-chip">
                   <input type="checkbox" name="notification-prayer" value="fajr" />
                   <span>Фаджр</span>
@@ -323,7 +353,7 @@
               </fieldset>
               <label class="toggle-row" for="notifications-current-city-only">
                 <input id="notifications-current-city-only" type="checkbox" checked />
-                <span>Только для текущего выбранного города</span>
+                <span data-i18n="settings.notificationsCurrentCityOnly">Только для текущего выбранного города</span>
               </label>
               <p id="notifications-status" class="panel-meta">Разрешение пока не выдано.</p>
             </div>
@@ -335,27 +365,27 @@
         <section class="panel prose-panel">
           <div class="panel-head">
             <div>
-              <p class="eyebrow">О проекте</p>
-              <h2>Как работает сервис</h2>
+              <p class="eyebrow" data-i18n="about.eyebrow">О проекте</p>
+              <h2 data-i18n="about.title">Как работает сервис</h2>
             </div>
           </div>
 
           <div class="prose">
-            <p>
+            <p data-i18n="about.p1">
               Сервис показывает времена намаза для выбранного города или текущего местоположения
               пользователя. Данные нормализуются backend-сервисом и отображаются в едином
               интерфейсе.
             </p>
-            <p>
+            <p data-i18n="about.p2">
               Времена намаза могут отличаться в зависимости от выбранного метода расчёта, региона и
               локальной религиозной практики. Для религиозно значимых решений учитывайте расписание
               своей местной мечети или духовного управления.
             </p>
-            <p>
+            <p data-i18n="about.p3">
               Геолокация используется только после явного согласия пользователя в браузере.
               Пользовательские настройки сохраняются локально в браузере через localStorage.
             </p>
-            <p>Контакты: <a href="mailto:support@example.com">support@example.com</a></p>
+            <p><span data-i18n="about.contacts">Контакты:</span> <a href="mailto:support@example.com">support@example.com</a></p>
           </div>
         </section>
       </section>

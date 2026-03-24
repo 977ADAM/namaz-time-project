@@ -43,6 +43,23 @@ export function reverseLocation(latitude: number, longitude: number): Promise<Lo
   return fetchJson<LocationSearchResponse>(`/api/v1/location/reverse?lat=${latitude}&lng=${longitude}`);
 }
 
+export function loadPrayerTimesForLocation(params: {
+  latitude: number;
+  longitude: number;
+  method: string;
+  school: string;
+  date: string;
+}): Promise<PrayerTimesResponse> {
+  const searchParams = new URLSearchParams({
+    lat: String(params.latitude),
+    lng: String(params.longitude),
+    method: params.method,
+    school: params.school,
+    date: params.date,
+  });
+  return fetchJson<PrayerTimesResponse>(`/api/v1/prayer-times/today?${searchParams.toString()}`);
+}
+
 export function loadPrayerBundle(
   params: PrayerBundleParams
 ): Promise<[PrayerTimesResponse, PrayerTimesResponse, PrayerCalendarResponse]> {

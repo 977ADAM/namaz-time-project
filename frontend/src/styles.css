@@ -54,6 +54,14 @@
   --hero-glow: linear-gradient(135deg, rgba(65, 114, 196, 0.18), rgba(93, 72, 176, 0.16));
 }
 
+:root[data-pre-prayer="active"] {
+  --hero-glow: linear-gradient(135deg, rgba(196, 139, 50, 0.24), rgba(15, 118, 110, 0.18));
+}
+
+:root[data-pre-prayer="imminent"] {
+  --hero-glow: linear-gradient(135deg, rgba(255, 125, 95, 0.28), rgba(196, 139, 50, 0.2));
+}
+
 * {
   box-sizing: border-box;
 }
@@ -320,6 +328,11 @@ h2 {
   margin-top: 12px;
 }
 
+.mobile-change-city-button {
+  display: none;
+  margin-top: 18px;
+}
+
 .quick-presets-head {
   margin-top: 22px;
 }
@@ -394,6 +407,40 @@ h2 {
 .preset-meta {
   margin-top: 6px;
   color: var(--muted);
+}
+
+.compare-panel {
+  margin-top: 22px;
+}
+
+.compare-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.compare-card {
+  min-height: 140px;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.42);
+  text-align: left;
+  color: var(--ink);
+}
+
+.compare-card-active {
+  border-color: rgba(15, 118, 110, 0.42);
+  box-shadow: 0 16px 28px rgba(15, 118, 110, 0.14);
+}
+
+.compare-inline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
 }
 
 input,
@@ -489,6 +536,15 @@ button:hover {
   position: relative;
   overflow: hidden;
   animation: heroFloat 8s ease-in-out infinite;
+}
+
+:root[data-pre-prayer="active"] .hero-prayer-card {
+  animation: heroFloat 5s ease-in-out infinite;
+  box-shadow: 0 24px 46px rgba(196, 139, 50, 0.18);
+}
+
+:root[data-pre-prayer="imminent"] .hero-prayer-card {
+  animation: heroBurst 1.5s ease-in-out infinite;
 }
 
 .hero-prayer-top {
@@ -688,6 +744,13 @@ button:hover {
   background: rgba(255, 255, 255, 0.28);
 }
 
+.install-field {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
 .compact-field {
   margin-top: 14px;
 }
@@ -821,7 +884,8 @@ button:hover {
   .timings-grid,
   .toolbar,
   .trust-grid,
-  .quick-presets-list {
+  .quick-presets-list,
+  .compare-list {
     grid-template-columns: 1fr;
     flex-direction: column;
     align-items: stretch;
@@ -862,7 +926,21 @@ button:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .mobile-change-city-button {
+    display: block;
+  }
+
   .hero-prayer-top {
     flex-direction: column;
+  }
+
+  .summary-grid,
+  .dates-row {
+    gap: 10px;
+  }
+
+  .compare-inline {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

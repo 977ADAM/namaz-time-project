@@ -1,4 +1,4 @@
-import type { LocationResult, NotifiablePrayerKey, QuickPreset } from "./types";
+import type { AppLanguage, LocationResult, NotifiablePrayerKey, QuickPreset } from "./types";
 
 export const STORAGE_KEYS = {
   selectedCity: "selectedCity",
@@ -13,6 +13,7 @@ export const STORAGE_KEYS = {
   notificationPrayerKeys: "notificationPrayerKeys",
   notificationCurrentCityOnly: "notificationCurrentCityOnly",
   quickPresetLocations: "quickPresetLocations",
+  pwaInstallDismissed: "pwaInstallDismissed",
 } as const;
 
 export const DEFAULT_LOCATION: LocationResult = {
@@ -50,10 +51,9 @@ export const QUICK_PRESET_BASE_LOCATIONS: Record<string, LocationResult> = {
 };
 
 export const QUICK_PRESET_DEFAULTS: QuickPreset[] = [
-  { id: "home", label: "Дом", location: null, assignable: true },
-  { id: "work", label: "Работа", location: null, assignable: true },
-  { id: "makkah", label: "Мекка", location: QUICK_PRESET_BASE_LOCATIONS.makkah, assignable: false },
-  { id: "tashkent", label: "Ташкент", location: QUICK_PRESET_BASE_LOCATIONS.tashkent, assignable: false },
+  { id: "home", label: "Дом", location: null, assignable: true, notificationProfile: null },
+  { id: "work", label: "Работа", location: null, assignable: true, notificationProfile: null },
+  { id: "travel", label: "Путешествие", location: null, assignable: true, notificationProfile: null },
 ];
 
 export const PRAYER_LABELS = {
@@ -77,9 +77,9 @@ export const WEEKDAYS = {
   Sunday: "Воскресенье",
 } as const;
 
-export const ROUTE_TITLES = {
-  "/": "Времена намаза",
-  "/monthly": "Месячное расписание намаза",
-  "/settings": "Настройки Namaz Time",
-  "/about": "О проекте Namaz Time",
-} as const;
+export const LANGUAGE_LOCALES: Record<AppLanguage, string> = {
+  ru: "ru-RU",
+  en: "en-US",
+  uz: "uz-UZ",
+  ar: "ar-SA",
+};

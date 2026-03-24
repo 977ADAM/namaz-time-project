@@ -1,7 +1,9 @@
 import { STORAGE_KEYS } from "./constants";
 import { loadFavoriteLocations, loadQuickPresets, loadStoredLocation, readSetting } from "./storage";
 import type {
+  AppLanguage,
   CalculationMethod,
+  CityComparison,
   LocationResult,
   NotifiablePrayerKey,
   PrayerCalendarResponse,
@@ -17,7 +19,7 @@ export interface AppState {
   quickPresets: QuickPreset[];
   method: string;
   school: string;
-  language: string;
+  language: AppLanguage;
   theme: string;
   timeFormat: string;
   notificationsEnabled: boolean;
@@ -29,6 +31,7 @@ export interface AppState {
   monthly: PrayerCalendarResponse | null;
   liveCurrentPrayer: PrayerMoment | null;
   liveNextPrayer: PrayerMoment | null;
+  cityComparisons: CityComparison[];
   lastUpdatedAt: Date | null;
   monthlyDate: Date;
   debounceTimer: number | null;
@@ -36,6 +39,15 @@ export interface AppState {
   lastCurrentPrayerKey: string | null;
   lastVisualPrayerKey: string | null;
   sentNotificationKeys: Set<string>;
+  deferredInstallPrompt: BeforeInstallPromptEvent | null;
+  pwaInstallAvailable: boolean;
+  serviceWorkerReady: boolean;
+  activePresetId: string | null;
+}
+
+export interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 }
 
 export function createAppState(): AppState {
@@ -51,7 +63,7 @@ export function createAppState(): AppState {
     quickPresets: loadQuickPresets(),
     method: readSetting(STORAGE_KEYS.calculationMethod, "2"),
     school: readSetting(STORAGE_KEYS.school, "0"),
-    language: readSetting(STORAGE_KEYS.language, "ru"),
+    language: readSetting(STORAGE_KEYS.language, "ru") as AppLanguage,
     theme: readSetting(STORAGE_KEYS.theme, "system"),
     timeFormat: readSetting(STORAGE_KEYS.timeFormat, "24h"),
     notificationsEnabled: readSetting(STORAGE_KEYS.notificationsEnabled, "false") === "true",
@@ -63,6 +75,7 @@ export function createAppState(): AppState {
     monthly: null,
     liveCurrentPrayer: null,
     liveNextPrayer: null,
+    cityComparisons: [],
     lastUpdatedAt: null,
     monthlyDate: new Date(),
     debounceTimer: null,
@@ -70,5 +83,9 @@ export function createAppState(): AppState {
     lastCurrentPrayerKey: null,
     lastVisualPrayerKey: null,
     sentNotificationKeys: new Set<string>(),
+    deferredInstallPrompt: null,
+    pwaInstallAvailable: false,
+    serviceWorkerReady: false,
+    activePresetId: null,
   };
 }

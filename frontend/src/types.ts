@@ -1,5 +1,13 @@
 export type PrayerKey = "fajr" | "sunrise" | "dhuhr" | "asr" | "maghrib" | "isha";
 export type NotifiablePrayerKey = Exclude<PrayerKey, "sunrise">;
+export type AppLanguage = "ru" | "en" | "uz" | "ar";
+
+export interface NotificationProfile {
+  enabled: boolean;
+  leadMinutes: number;
+  prayerKeys: NotifiablePrayerKey[];
+  currentCityOnly: boolean;
+}
 
 export interface LocationResult {
   id: string;
@@ -122,4 +130,16 @@ export interface QuickPreset {
   label: string;
   location: LocationResult | null;
   assignable: boolean;
+  notificationProfile: NotificationProfile | null;
+}
+
+export interface CityComparison {
+  presetId: string;
+  presetLabel: string;
+  city: string;
+  timezone: string;
+  nextPrayerLabel: string;
+  nextPrayerTime: string;
+  countdownLabel: string;
+  isActive: boolean;
 }

@@ -68,6 +68,17 @@ export function formatMonthYear(date: Date, locale = "ru-RU"): string {
   return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(date);
 }
 
+export function formatDateTime(date: Date, locale = "ru-RU", timezone?: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    day: "2-digit",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZone: timezone,
+  }).format(date);
+}
+
 export function getIsoDateInTimezone(timezone: string, sourceDate = new Date()): string {
   const parts = getFormatterParts(sourceDate, timezone);
   return `${parts.year}-${parts.month}-${parts.day}`;

@@ -1,8 +1,9 @@
 import { PRAYER_LABELS, WEEKDAYS } from "./constants";
 import type { AppElements } from "./dom";
-import { formatMonthYear, formatTime } from "./formatters";
+import { formatDateTime, formatMonthYear, formatTime } from "./formatters";
+import { getLocaleCode, t } from "./locales";
 import type { AppState } from "./state";
-import type { LocationResult, NotifiablePrayerKey, PrayerMoment, QuickPreset } from "./types";
+import type { CityComparison, LocationResult, NotifiablePrayerKey, PrayerMoment, QuickPreset } from "./types";
 
 export function setStatus(elements: AppElements, message: string): void {
   elements.status.textContent = message;
@@ -57,12 +58,16 @@ export function renderTodayTimings(state: AppState, elements: AppElements): void
 }
 
 export function renderMonthlyMeta(state: AppState, elements: AppElements): void {
-  const monthLabel = formatMonthYear(state.monthlyDate);
+  const monthLabel = formatMonthYear(state.monthlyDate, getLocaleCode(state.language));
   elements.monthCurrentLabel.textContent = monthLabel;
-  elements.monthlyTitle.textContent = `Расписание на ${monthLabel}`;
+  elements.monthlyTitle.textContent = `${t(state.language, "monthly.title")} ${monthLabel}`;
   const methodName =
     state.methods.find((item) => String(item.id) === String(state.method))?.name || "Метод не выбран";
   elements.monthlyMeta.textContent = `${state.location.display_name} • ${methodName}`;
+}
+
+function getPresetLabel(state: AppState, preset: QuickPreset): string {
+  return t(state.language, `preset.${preset.id}`);
 }
 
 export function renderMonthlyTable(state: AppState, elements: AppElements): void {
@@ -148,7 +153,7 @@ export function renderFavoriteCities(
 
 export function renderFavoriteToggle(state: AppState, elements: AppElements): void {
   const isFavorite = state.favorites.some((item) => item.id === state.location.id);
-  elements.favoriteToggleButton.textContent = isFavorite ? "Убрать из избранного" : "В избранное";
+  elements.favoriteToggleButton.textContent = isFavorite ? "Убрать из избранного" : t(state.language, "favorites.toggle");
 }
 
 export function renderQuickPresets(
@@ -168,7 +173,7 @@ export function renderQuickPresets(
       button.classList.add("preset-card-empty");
     }
     button.innerHTML = `
-      <span class="preset-label">${preset.label}</span>
+      <span class="preset-label">${getPresetLabel(state, preset)}</span>
       <strong class="preset-title">${preset.location?.city || "Сохранить текущий"}</strong>
       <small class="preset-meta">${preset.location?.country || "Нажмите, чтобы привязать активный город"}</small>
     `;
@@ -176,6 +181,41 @@ export function renderQuickPresets(
       void onSelect(preset);
     });
     elements.quickPresetsList.appendChild(button);
+  });
+}
+
+export function renderCityComparisons(
+  comparisons: CityComparison[],
+  elements: AppElements,
+  onSelect: (presetId: string) => void | Promise<void>
+): void {
+  elements.compareList.innerHTML = "";
+  if (!comparisons.length) {
+    elements.compareList.innerHTML = `<div class="empty-state compact">Сохраните города в Дом, Работа или Путешествие, чтобы сравнивать их.</div>`;
+    return;
+  }
+
+  comparisons.forEach((item) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "compare-card";
+    if (item.isActive) {
+      button.classList.add("compare-card-active");
+    }
+    button.innerHTML = `
+      <span class="preset-label">${item.presetLabel}</span>
+      <strong class="preset-title">${item.city}</strong>
+      <small class="preset-meta">${item.timezone}</small>
+      <div class="compare-inline">
+        <span>${item.nextPrayerLabel}</span>
+        <strong>${item.nextPrayerTime}</strong>
+      </div>
+      <small class="preset-meta">${item.countdownLabel}</small>
+    `;
+    button.addEventListener("click", () => {
+      void onSelect(item.presetId);
+    });
+    elements.compareList.appendChild(button);
   });
 }
 
@@ -226,13 +266,11 @@ export function renderTrustLayer(state: AppState, elements: AppElements): void {
   const methodName = state.today?.method?.name || "Метод ещё не выбран";
   const timezone = state.today?.location?.timezone || state.location.timezone || "timezone не определён";
   const updatedAt = state.lastUpdatedAt
-    ? new Intl.DateTimeFormat("ru-RU", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        day: "2-digit",
-        month: "long",
-      }).format(state.lastUpdatedAt)
+    ? formatDateTime(
+        state.lastUpdatedAt,
+        getLocaleCode(state.language),
+        state.today?.location?.timezone || state.location.timezone || undefined
+      )
     : "ещё не обновлялось";
 
   elements.trustMethod.textContent = methodName;
@@ -241,6 +279,14 @@ export function renderTrustLayer(state: AppState, elements: AppElements): void {
   elements.trustUpdated.textContent = updatedAt;
   elements.trustDisclaimer.textContent =
     "Время рассчитано по выбранному методу и может отличаться от расписания местной мечети или духовного управления.";
+}
+
+export function renderInstallState(state: AppState, elements: AppElements): void {
+  elements.installAppButton.disabled = !state.pwaInstallAvailable;
+  elements.installAppButton.textContent = t(state.language, "settings.installButton");
+  elements.installAppStatus.textContent = state.pwaInstallAvailable
+    ? "Приложение готово к установке на устройство."
+    : t(state.language, "settings.installUnavailable");
 }
 
 export function syncSettings(state: AppState, elements: AppElements): void {
