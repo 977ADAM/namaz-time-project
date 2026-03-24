@@ -6,28 +6,11 @@ interface PendingPrayerMoment extends Omit<PrayerMoment, "datetime"> {
   datetime: Date | null;
 }
 
-export function getPrayerMoments(
-  todayPayload: PrayerTimesResponse | null,
-  tomorrowPayload: PrayerTimesResponse | null
+function buildPrayerMoments(
+  items: ReadonlyArray<readonly [PrayerMoment["key"], string, string]>,
+  timezone: string
 ): PrayerMoment[] {
-  if (!todayPayload?.times || !todayPayload.location?.timezone) {
-    return [];
-  }
-
-  const timezone = todayPayload.location.timezone;
-  const moments: Array<[PrayerMoment["key"], string, string]> = [
-    ["fajr", todayPayload.date.gregorian, todayPayload.times.fajr],
-    ["dhuhr", todayPayload.date.gregorian, todayPayload.times.dhuhr],
-    ["asr", todayPayload.date.gregorian, todayPayload.times.asr],
-    ["maghrib", todayPayload.date.gregorian, todayPayload.times.maghrib],
-    ["isha", todayPayload.date.gregorian, todayPayload.times.isha],
-  ];
-
-  if (tomorrowPayload?.times?.fajr) {
-    moments.push(["fajr", tomorrowPayload.date.gregorian, tomorrowPayload.times.fajr]);
-  }
-
-  const pendingMoments: PendingPrayerMoment[] = moments
+  const pendingMoments: PendingPrayerMoment[] = items
     .map(([key, targetDate, time]) => ({
       key,
       label: PRAYER_LABELS[key],
@@ -45,15 +28,46 @@ export function getPrayerState(
   todayPayload: PrayerTimesResponse | null,
   tomorrowPayload: PrayerTimesResponse | null
 ): { current: PrayerMoment | null; next: PrayerMoment | null } {
-  const moments = getPrayerMoments(todayPayload, tomorrowPayload);
+  if (!todayPayload?.times || !todayPayload.location?.timezone) {
+    return { current: null, next: null };
+  }
+
+  const timezone = todayPayload.location.timezone;
+  const currentMoments = buildPrayerMoments(
+    [
+      ["fajr", todayPayload.date.gregorian, todayPayload.times.fajr],
+      ["dhuhr", todayPayload.date.gregorian, todayPayload.times.dhuhr],
+      ["asr", todayPayload.date.gregorian, todayPayload.times.asr],
+      ["maghrib", todayPayload.date.gregorian, todayPayload.times.maghrib],
+      ["isha", todayPayload.date.gregorian, todayPayload.times.isha],
+    ],
+    timezone
+  );
+  const nextMoments = buildPrayerMoments(
+    [
+      ["fajr", todayPayload.date.gregorian, todayPayload.times.fajr],
+      ["dhuhr", todayPayload.date.gregorian, todayPayload.times.dhuhr],
+      ["asr", todayPayload.date.gregorian, todayPayload.times.asr],
+      ["maghrib", todayPayload.date.gregorian, todayPayload.times.maghrib],
+      ["isha", todayPayload.date.gregorian, todayPayload.times.isha],
+      ...(tomorrowPayload?.times?.fajr
+        ? ([["fajr", tomorrowPayload.date.gregorian, tomorrowPayload.times.fajr]] as const)
+        : []),
+    ],
+    timezone
+  );
   const now = new Date();
   let current: PrayerMoment | null = null;
   let next: PrayerMoment | null = null;
 
-  moments.forEach((moment) => {
+  currentMoments.forEach((moment) => {
     if (moment.datetime <= now) {
       current = moment;
-    } else if (!next) {
+    }
+  });
+
+  nextMoments.forEach((moment) => {
+    if (!next && moment.datetime > now) {
       next = moment;
     }
   });

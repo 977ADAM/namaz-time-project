@@ -248,7 +248,7 @@ docker compose down
 ## Тесты
 
 ```bash
-PYTHONPATH=backend ./venv/bin/python -m unittest discover -s tests -v
+./venv/bin/python -m unittest discover -s tests -t . -v
 ```
 
 ## Что стоит добавить во вторую фазу

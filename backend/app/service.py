@@ -1,5 +1,5 @@
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from time import monotonic
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -82,6 +82,7 @@ class PrayerTimesService:
 
         payload = await self._fetch_timings(request)
         result = self._map_payload(request, payload)
+        result = await self._attach_live_prayer_state(result, request)
         self._cache_response(cache_key, result)
         return result
 
@@ -274,9 +275,40 @@ class PrayerTimesService:
                 offset=meta_raw.get("offset"),
             ),
         )
+        return response
+
+    async def _attach_live_prayer_state(
+        self,
+        response: PrayerTimesResponse,
+        request: PrayerRequest,
+    ) -> PrayerTimesResponse:
         response.current_prayer = self._detect_current_prayer(response)
         response.next_prayer = self._detect_next_prayer(response)
         response.next_prayer_date = request.target_date if response.next_prayer else None
+
+        if response.next_prayer is not None:
+            return response
+
+        zone, now = self._get_response_now(response)
+        if zone is None or now is None or now.date() != request.target_date:
+            return response
+
+        next_day_request = build_prayer_request(
+            latitude=request.latitude,
+            longitude=request.longitude,
+            method=request.method,
+            school=request.school,
+            target_date=request.target_date + timedelta(days=1),
+        )
+        next_day_payload = await self._fetch_timings(next_day_request)
+        next_day_response = self._map_payload(next_day_request, next_day_payload)
+        if next_day_response.timings.fajr:
+            response.next_prayer = PrayerNameValue(
+                key="fajr",
+                label="Фаджр",
+                time=next_day_response.timings.fajr,
+            )
+            response.next_prayer_date = next_day_request.target_date
         return response
 
     def _map_calendar_payload(self, payload: dict, *, year: int, month: int) -> PrayerCalendarResponse:
@@ -431,16 +463,10 @@ class PrayerTimesService:
         )
 
     def _detect_current_prayer(self, response: PrayerTimesResponse) -> PrayerNameValue | None:
-        timezone = response.meta.timezone
-        if not timezone:
+        zone, now = self._get_response_now(response)
+        if zone is None or now is None:
             return None
 
-        try:
-            zone = ZoneInfo(timezone)
-        except ZoneInfoNotFoundError:
-            return None
-
-        now = datetime.now(zone)
         prayer_sequence = [
             ("isha", "Иша", response.timings.isha),
             ("maghrib", "Магриб", response.timings.maghrib),
@@ -458,16 +484,9 @@ class PrayerTimesService:
         return None
 
     def _detect_next_prayer(self, response: PrayerTimesResponse) -> PrayerNameValue | None:
-        timezone = response.meta.timezone
-        if not timezone:
+        zone, now = self._get_response_now(response)
+        if zone is None or now is None:
             return None
-
-        try:
-            zone = ZoneInfo(timezone)
-        except ZoneInfoNotFoundError:
-            return None
-
-        now = datetime.now(zone)
         prayer_sequence = [
             ("fajr", "Фаджр", response.timings.fajr),
             ("dhuhr", "Зухр", response.timings.dhuhr),
@@ -483,6 +502,19 @@ class PrayerTimesService:
             if prayer_time >= now:
                 return PrayerNameValue(key=key, label=label, time=value)
         return None
+
+    @staticmethod
+    def _get_response_now(response: PrayerTimesResponse) -> tuple[ZoneInfo | None, datetime | None]:
+        timezone = response.meta.timezone
+        if not timezone:
+            return None, None
+
+        try:
+            zone = ZoneInfo(timezone)
+        except ZoneInfoNotFoundError:
+            return None, None
+
+        return zone, datetime.now(zone)
 
     @staticmethod
     def _build_prayer_datetime(target_date: date, value: str, zone: ZoneInfo) -> datetime:
