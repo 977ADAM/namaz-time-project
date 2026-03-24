@@ -423,20 +423,23 @@ function getSelectedNotificationPrayers(elements: AppElements): NotifiablePrayer
 }
 
 function buildLiveStatus(current: PrayerMoment | null, next: PrayerMoment | null, totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.max(1, Math.ceil((totalSeconds % 3600) / 60));
+
   if (totalSeconds <= 60 && next) {
-    return `Ещё немного, и начнётся ${next.label}. Подготовьтесь к намазу.`;
+    return `Переход уже начинается: через мгновение наступит ${next.label}.`;
   }
   if (totalSeconds <= 10 * 60 && next) {
-    return `До ${next.label} осталось ${Math.ceil(totalSeconds / 60)} мин. Спокойный режим подготовки уже включён.`;
+    return `До ${next.label} осталось ${Math.ceil(totalSeconds / 60)} мин. Экран уже перешёл в режим спокойной подготовки.`;
   }
   if (!current && next) {
-    return `До первого намаза сегодня осталось ${Math.ceil(totalSeconds / 60)} мин.`;
+    return `День ещё не начался: до первого намаза осталось ${hours > 0 ? `${hours} ч ` : ""}${minutes} мин.`;
   }
   if (current && next) {
-    return `Сейчас идёт ${current.label}. До ${next.label} осталось ${Math.ceil(totalSeconds / 60)} мин.`;
+    return `Сейчас время ${current.label}. До ${next.label} осталось ${hours > 0 ? `${hours} ч ` : ""}${minutes} мин.`;
   }
   if (current) {
-    return `Сейчас идёт ${current.label}.`;
+    return `Сейчас время ${current.label}. Следующий ориентир появится после обновления данных.`;
   }
   return "Ожидаем время следующего намаза.";
 }
@@ -535,15 +538,17 @@ async function dispatchNotification(
 function applyAtmosphere(current: PrayerMoment | null, next: PrayerMoment | null, totalSeconds: number): void {
   const phase = resolvePhase(current, next);
   document.documentElement.dataset.phase = phase;
-  const prePrayerState = totalSeconds <= 10 * 60 ? (totalSeconds <= 60 ? "imminent" : "active") : "idle";
+  const prePrayerState =
+    totalSeconds <= 15 * 60 ? (totalSeconds <= 60 ? "imminent" : totalSeconds <= 5 * 60 ? "active" : "warm") : "idle";
   document.documentElement.dataset.prePrayer = prePrayerState;
 }
 
 function resolvePhase(current: PrayerMoment | null, next: PrayerMoment | null): string {
-  const anchor = current?.key ?? next?.key;
+  const anchor = next?.key ?? current?.key;
   switch (anchor) {
     case "fajr":
       return "dawn";
+    case "sunrise":
     case "dhuhr":
     case "asr":
       return "day";
@@ -724,4 +729,6 @@ function bindEvents(state: AppState, elements: AppElements): void {
   elements.heroPrayerCard.addEventListener("animationend", () => {
     elements.heroPrayerCard.classList.remove("hero-prayer-card-burst");
   });
+
+  applyAtmosphere(null, null, Number.POSITIVE_INFINITY);
 }

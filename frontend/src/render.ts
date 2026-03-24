@@ -5,6 +5,15 @@ import { getLocaleCode, t } from "./locales";
 import type { AppState } from "./state";
 import type { CityComparison, LocationResult, NotifiablePrayerKey, PrayerMoment, QuickPreset } from "./types";
 
+const HERO_TONES: Record<string, { accent: string; glow: string }> = {
+  fajr: { accent: "#7d8cff", glow: "rgba(125, 140, 255, 0.32)" },
+  sunrise: { accent: "#f2a65a", glow: "rgba(242, 166, 90, 0.3)" },
+  dhuhr: { accent: "#18a689", glow: "rgba(24, 166, 137, 0.28)" },
+  asr: { accent: "#2f9e8f", glow: "rgba(47, 158, 143, 0.28)" },
+  maghrib: { accent: "#ff7b5f", glow: "rgba(255, 123, 95, 0.3)" },
+  isha: { accent: "#6874ff", glow: "rgba(104, 116, 255, 0.28)" },
+};
+
 function formatWeekdayLabel(dayIsoDate: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, { weekday: "long" }).format(new Date(`${dayIsoDate}T00:00:00Z`));
 }
@@ -48,6 +57,7 @@ export function renderTodayTimings(state: AppState, elements: AppElements): void
   Object.entries(state.today.times).forEach(([key, rawTime]) => {
     const card = document.createElement("article");
     card.className = "timing-card";
+    card.dataset.prayer = key;
     if (key === currentKey) {
       card.classList.add("timing-card-current");
     } else if (key === nextKey) {
@@ -235,10 +245,20 @@ export function renderHeroState(
     progressPercent: number;
   }
 ): void {
-  elements.heroPrayerName.textContent = payload.next?.label || "Нет данных";
-  elements.heroPrayerTime.textContent = payload.next
+  const nextKey = payload.next?.key ?? payload.current?.key ?? "fajr";
+  const tone = HERO_TONES[nextKey] || HERO_TONES.fajr;
+  const nextMomentLabel = payload.next
     ? `${payload.next.date === state.today?.date?.gregorian ? t(state.language, "countdown.today") : t(state.language, "countdown.tomorrow")} ${formatTime(payload.next.time, state.timeFormat)}`
     : t(state.language, "status.chooseCity");
+
+  elements.heroPrayerCard.dataset.prayer = nextKey;
+  elements.heroPrayerCard.dataset.hasCurrent = payload.current ? "true" : "false";
+  elements.heroPrayerCard.style.setProperty("--hero-accent", tone.accent);
+  elements.heroPrayerCard.style.setProperty("--hero-glow-color", tone.glow);
+  elements.heroProgressBar.style.setProperty("--hero-accent", tone.accent);
+  elements.heroProgressBar.style.setProperty("--hero-glow-color", tone.glow);
+  elements.heroPrayerName.textContent = payload.next?.label || "Нет данных";
+  elements.heroPrayerTime.textContent = nextMomentLabel;
   elements.heroCountdown.textContent = payload.countdown;
   elements.heroStatus.textContent = payload.liveStatus;
   elements.heroProgressBar.style.width = `${payload.progressPercent}%`;
