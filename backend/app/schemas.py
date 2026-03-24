@@ -51,13 +51,16 @@ class PrayerTimesResponse(BaseModel):
     timings: PrayerTimings
     date: PrayerDateInfo
     meta: PrayerMeta
+    current_prayer: PrayerNameValue | None = None
     next_prayer: PrayerNameValue | None = None
+    next_prayer_date: date | None = None
 
 
 class PrayerCalendarDay(BaseModel):
     requested_date: date
     readable_date: str
     hijri_date: str
+    weekday: str
     timings: PrayerTimings
 
 
@@ -70,8 +73,10 @@ class PrayerCalendarResponse(BaseModel):
 
 
 class LocationResult(BaseModel):
+    id: str
     city: str
     country: str
+    region: str | None = None
     display_name: str
     latitude: float
     longitude: float
@@ -81,6 +86,26 @@ class LocationResult(BaseModel):
 class LocationSearchResponse(BaseModel):
     query: str
     results: list[LocationResult]
+
+
+class CalculationMethod(BaseModel):
+    id: int
+    code: str
+    name: str
+
+
+class MethodsResponse(BaseModel):
+    methods: list[CalculationMethod]
+
+
+class ApiErrorBody(BaseModel):
+    code: str
+    message: str
+    details: dict | None = None
+
+
+class ApiErrorResponse(BaseModel):
+    error: ApiErrorBody
 
 
 class HealthResponse(BaseModel):

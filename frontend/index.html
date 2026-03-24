@@ -4,6 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Времена намаза</title>
+    <meta
+      name="description"
+      content="Актуальные времена намаза для выбранного города или текущего местоположения: сегодня, следующий намаз, таймер и месячное расписание."
+    />
+    <meta property="og:title" content="Времена намаза" />
+    <meta
+      property="og:description"
+      content="Быстрый и удобный сайт с временами намаза, определением города, таймером и расписанием на месяц."
+    />
+    <meta property="og:type" content="website" />
+    <link rel="canonical" href="/" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -13,127 +24,239 @@
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
-    <main class="page">
-      <section class="hero">
+    <div class="background-orb background-orb-one" aria-hidden="true"></div>
+    <div class="background-orb background-orb-two" aria-hidden="true"></div>
+
+    <main class="shell">
+      <header class="site-header">
+        <a href="/" class="brand" data-nav>
+          <span class="brand-mark">N</span>
+          <span>
+            <strong>Namaz Time</strong>
+            <small>Времена намаза каждый день</small>
+          </span>
+        </a>
+
+        <nav class="main-nav" aria-label="Основная навигация">
+          <a href="/" data-nav>Сегодня</a>
+          <a href="/monthly" data-nav>Месяц</a>
+          <a href="/settings" data-nav>Настройки</a>
+          <a href="/about" data-nav>О проекте</a>
+        </nav>
+      </header>
+
+      <section class="hero-panel">
         <div class="hero-copy">
-          <p class="eyebrow">Namaz Time</p>
-          <h1>Актуальные времена намаза для вашего города.</h1>
-          <p class="subtitle">
-            Сайт определяет местоположение автоматически или позволяет выбрать город вручную,
-            показывает времена намаза на сегодня, следующий намаз и расписание на весь месяц.
+          <p class="eyebrow">Production-ready prayer times</p>
+          <h1 id="hero-title">Актуальные времена намаза для вашего города.</h1>
+          <p class="hero-text" id="hero-subtitle">
+            Определяйте местоположение автоматически или выбирайте город вручную, чтобы увидеть
+            расписание на сегодня, следующий намаз и календарь на месяц.
           </p>
-          <div class="hero-points">
-            <span>Сегодня</span>
-            <span>Следующий намаз</span>
-            <span>Календарь на месяц</span>
-          </div>
         </div>
-        <div class="card">
-          <form id="prayer-form" class="form">
-            <label>
-              <span>Город</span>
-              <div class="inline-field">
-                <input
-                  id="city-query"
-                  name="city"
-                  type="text"
-                  placeholder="Например, Moscow, Kazan, Istanbul"
-                  autocomplete="off"
-                  required
-                />
-                <button id="search-button" type="submit">Показать</button>
-              </div>
-            </label>
-            <div class="toolbar">
-              <button id="locate-button" type="button" class="secondary-button">
-                Определить местоположение
-              </button>
-              <label>
-                <span>Метод расчёта</span>
-                <select id="method-select" name="method">
-                  <option value="2" selected>ISNA</option>
-                  <option value="3">MWL</option>
-                  <option value="4">Umm al-Qura</option>
-                  <option value="5">Egyptian</option>
-                  <option value="8">Gulf Region</option>
-                  <option value="9">Kuwait</option>
-                  <option value="13">Diyanet</option>
-                </select>
-              </label>
-              <label>
-                <span>Аср</span>
-                <select id="school-select" name="school">
-                  <option value="0" selected>Standard</option>
-                  <option value="1">Hanafi</option>
-                </select>
-              </label>
+
+        <aside class="search-panel">
+          <form id="city-form" class="city-form">
+            <label for="city-query">Город</label>
+            <div class="search-row">
+              <input
+                id="city-query"
+                type="text"
+                placeholder="Например, Tashkent, Kazan, Istanbul"
+                autocomplete="off"
+              />
+              <button id="search-button" type="submit">Найти</button>
             </div>
-            <input id="latitude-input" name="latitude" type="hidden" value="55.7558" />
-            <input id="longitude-input" name="longitude" type="hidden" value="37.6173" />
-            <input id="date-input" name="date" type="hidden" />
           </form>
+
+          <div class="toolbar">
+            <button id="locate-button" type="button" class="secondary-button">
+              Определить местоположение
+            </button>
+            <button id="retry-button" type="button" class="ghost-button">Повторить загрузку</button>
+          </div>
+
+          <div id="search-status" class="search-status" aria-live="polite"></div>
           <div id="search-results" class="search-results" aria-live="polite"></div>
+        </aside>
+      </section>
+
+      <section id="route-home" class="route-section active">
+        <div class="page-grid">
+          <section class="panel summary-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Сегодня</p>
+                <h2 id="today-title">Выберите город</h2>
+              </div>
+              <p id="today-meta" class="panel-meta">После выбора локации покажем актуальные данные.</p>
+            </div>
+
+            <div class="summary-grid">
+              <article class="metric-card accent">
+                <span class="metric-label">Следующий намаз</span>
+                <strong id="next-prayer-name">Нет данных</strong>
+                <span id="next-prayer-time" class="metric-meta">Выберите город</span>
+              </article>
+              <article class="metric-card">
+                <span class="metric-label">Текущий намаз</span>
+                <strong id="current-prayer-name">Нет данных</strong>
+                <span id="current-prayer-time" class="metric-meta">Ожидаем загрузку</span>
+              </article>
+              <article class="metric-card">
+                <span class="metric-label">Таймер</span>
+                <strong id="countdown-value">--:--:--</strong>
+                <span id="countdown-meta" class="metric-meta">До следующего намаза</span>
+              </article>
+              <article class="metric-card">
+                <span class="metric-label">Локация</span>
+                <strong id="location-name">Не выбрана</strong>
+                <span id="location-meta" class="metric-meta">Координаты и часовой пояс появятся после поиска</span>
+              </article>
+            </div>
+
+            <div class="dates-row">
+              <div class="date-card">
+                <span class="metric-label">Григорианская дата</span>
+                <strong id="gregorian-date">--</strong>
+              </div>
+              <div class="date-card">
+                <span class="metric-label">Исламская дата</span>
+                <strong id="hijri-date">--</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Сегодняшнее расписание</p>
+                <h2>Времена намаза</h2>
+              </div>
+              <p id="status" class="panel-meta">Готово к работе.</p>
+            </div>
+            <div id="today-times" class="timings-grid" aria-live="polite"></div>
+          </section>
         </div>
       </section>
 
-      <section class="results summary">
-        <div class="results-header">
-          <div>
-            <p class="eyebrow">Сегодня</p>
-            <h2 id="result-title">Выберите город</h2>
+      <section id="route-monthly" class="route-section">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Monthly</p>
+              <h2 id="monthly-title">Расписание на месяц</h2>
+            </div>
+            <p id="monthly-meta" class="panel-meta">Выберите город, чтобы открыть календарь.</p>
           </div>
-          <p id="result-meta" class="result-meta">После выбора города загрузим актуальные времена.</p>
-        </div>
-        <div class="overview-grid">
-          <article class="feature-card highlight">
-            <span class="feature-label">Следующий намаз</span>
-            <strong id="next-prayer-name">Нет данных</strong>
-            <span id="next-prayer-time" class="feature-meta">Выберите город</span>
-          </article>
-          <article class="feature-card">
-            <span class="feature-label">Локация</span>
-            <strong id="location-name">Не выбрана</strong>
-            <span id="location-coordinates" class="feature-meta">Координаты появятся после поиска</span>
-          </article>
-          <article class="feature-card">
-            <span class="feature-label">Метод</span>
-            <strong id="method-name">ISNA</strong>
-            <span id="timezone-name" class="feature-meta">Часовой пояс будет определён автоматически</span>
-          </article>
-        </div>
-        <div id="status" class="status">Готово к работе.</div>
-        <div id="timings" class="grid" aria-live="polite"></div>
+
+          <div class="month-toolbar">
+            <button id="prev-month-button" type="button" class="ghost-button">Предыдущий месяц</button>
+            <div class="month-current" id="month-current-label">Текущий месяц</div>
+            <button id="next-month-button" type="button" class="ghost-button">Следующий месяц</button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="calendar-table">
+              <thead>
+                <tr>
+                  <th>Дата</th>
+                  <th>День</th>
+                  <th>Хиджра</th>
+                  <th>Фаджр</th>
+                  <th>Восход</th>
+                  <th>Зухр</th>
+                  <th>Аср</th>
+                  <th>Магриб</th>
+                  <th>Иша</th>
+                </tr>
+              </thead>
+              <tbody id="monthly-body">
+                <tr>
+                  <td colspan="9" class="empty-cell">Нет данных для отображения.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </section>
 
-      <section class="results month-section">
-        <div class="results-header">
-          <div>
-            <p class="eyebrow">Календарь</p>
-            <h2 id="calendar-title">Расписание на месяц</h2>
+      <section id="route-settings" class="route-section">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Настройки</p>
+              <h2>Параметры отображения</h2>
+            </div>
+            <p class="panel-meta">Изменения применяются сразу и сохраняются на устройстве.</p>
           </div>
-          <p id="calendar-meta" class="result-meta">После выбора города покажем все даты текущего месяца.</p>
-        </div>
-        <div class="table-wrap">
-          <table class="calendar-table">
-            <thead>
-              <tr>
-                <th>Дата</th>
-                <th>Хиджра</th>
-                <th>Фаджр</th>
-                <th>Восход</th>
-                <th>Зухр</th>
-                <th>Аср</th>
-                <th>Магриб</th>
-                <th>Иша</th>
-              </tr>
-            </thead>
-            <tbody id="calendar-body">
-              <tr>
-                <td colspan="8" class="empty-cell">Выберите город, чтобы загрузить календарь.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+
+          <div class="settings-grid">
+            <label class="field">
+              <span>Метод расчёта</span>
+              <select id="settings-method"></select>
+            </label>
+            <label class="field">
+              <span>Школа для Асра</span>
+              <select id="settings-school">
+                <option value="0">Standard</option>
+                <option value="1">Hanafi</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Язык интерфейса</span>
+              <select id="settings-language">
+                <option value="ru">Русский</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Тема</span>
+              <select id="settings-theme">
+                <option value="system">Системная</option>
+                <option value="light">Светлая</option>
+                <option value="dark">Тёмная</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Формат времени</span>
+              <select id="settings-time-format">
+                <option value="24h">24 часа</option>
+                <option value="12h">12 часов</option>
+              </select>
+            </label>
+          </div>
+        </section>
+      </section>
+
+      <section id="route-about" class="route-section">
+        <section class="panel prose-panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">О проекте</p>
+              <h2>Как работает сервис</h2>
+            </div>
+          </div>
+
+          <div class="prose">
+            <p>
+              Сервис показывает времена намаза для выбранного города или текущего местоположения
+              пользователя. Данные нормализуются backend-сервисом и отображаются в едином
+              интерфейсе.
+            </p>
+            <p>
+              Времена намаза могут отличаться в зависимости от выбранного метода расчёта, региона и
+              локальной религиозной практики. Для религиозно значимых решений учитывайте расписание
+              своей местной мечети или духовного управления.
+            </p>
+            <p>
+              Геолокация используется только после явного согласия пользователя в браузере.
+              Пользовательские настройки сохраняются локально в браузере через `localStorage`.
+            </p>
+            <p>
+              Контакты: <a href="mailto:support@example.com">support@example.com</a>
+            </p>
+          </div>
+        </section>
       </section>
     </main>
 

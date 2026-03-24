@@ -49,7 +49,7 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         response = await self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Актуальные времена намаза", response.text)
+        self.assertIn("Времена намаза", response.text)
 
     async def test_prayer_times_endpoint(self):
         mocked_response = PrayerTimesResponse(
@@ -78,7 +78,9 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
                 school="STANDARD",
                 offset={"Fajr": 0},
             ),
+            current_prayer=PrayerNameValue(key="maghrib", label="Магриб", time="19:04"),
             next_prayer=PrayerNameValue(key="isha", label="Иша", time="20:42"),
+            next_prayer_date=date(2026, 3, 24),
         )
 
         with patch("app.main.service.get_prayer_times", AsyncMock(return_value=mocked_response)):
@@ -110,6 +112,7 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
                     requested_date=date(2026, 3, 24),
                     readable_date="24 Mar 2026",
                     hijri_date="05-10-1447",
+                    weekday="Tuesday",
                     timings=PrayerTimings(
                         fajr="04:12",
                         sunrise="05:55",
@@ -143,8 +146,10 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
     async def test_location_search_endpoint(self):
         mocked_locations = [
             LocationResult(
+                id="geo_1",
                 city="Moscow",
                 country="Russia",
+                region="Moscow",
                 display_name="Moscow, Russia",
                 latitude=55.7558,
                 longitude=37.6173,
@@ -156,3 +161,9 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["results"][0]["city"], "Moscow")
+
+    async def test_methods_endpoint(self):
+        response = await self.client.get("/api/v1/config/methods")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(len(response.json()["methods"]) >= 7)

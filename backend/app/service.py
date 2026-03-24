@@ -23,6 +23,15 @@ logger = logging.getLogger(__name__)
 
 class PrayerTimesService:
     ALLOWED_METHODS = {0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+    CALCULATION_METHODS = [
+        {"id": 3, "code": "MWL", "name": "Muslim World League"},
+        {"id": 4, "code": "UMM_AL_QURA", "name": "Umm al-Qura University, Makkah"},
+        {"id": 5, "code": "EGYPT", "name": "Egyptian General Authority of Survey"},
+        {"id": 1, "code": "KARACHI", "name": "University of Islamic Sciences, Karachi"},
+        {"id": 2, "code": "ISNA", "name": "Islamic Society of North America"},
+        {"id": 7, "code": "TEHRAN", "name": "Institute of Geophysics, University of Tehran"},
+        {"id": 0, "code": "JAFARI", "name": "Jafari / Shia Ithna-Ashari"},
+    ]
 
     def __init__(
         self,
@@ -40,6 +49,7 @@ class PrayerTimesService:
         self._client: httpx.AsyncClient | None = None
         self._cache: dict[tuple[float, float, int, int, str], tuple[float, PrayerTimesResponse]] = {}
         self._calendar_cache: dict[tuple[float, float, int, int, int, int], tuple[float, PrayerCalendarResponse]] = {}
+        self._timezone_cache: dict[tuple[float, float], tuple[float, str]] = {}
 
     async def get_prayer_times(self, request: PrayerRequest) -> PrayerTimesResponse:
         self._validate_method(request.method)
@@ -103,7 +113,10 @@ class PrayerTimesService:
         except httpx.RequestError as exc:
             raise RuntimeError(f"Location search is unavailable: {exc}") from exc
 
-        return [self._map_location_result(item) for item in response.json()]
+        results = [self._map_location_result(item) for item in response.json()]
+        for result in results:
+            result.timezone = await self._resolve_timezone(result.latitude, result.longitude)
+        return results
 
     async def reverse_geocode(self, *, latitude: float, longitude: float) -> LocationResult:
         client = await self._get_client()
@@ -125,7 +138,12 @@ class PrayerTimesService:
         except httpx.RequestError as exc:
             raise RuntimeError(f"Reverse geocoding is unavailable: {exc}") from exc
 
-        return self._map_location_result(response.json())
+        result = self._map_location_result(response.json())
+        result.timezone = await self._resolve_timezone(result.latitude, result.longitude)
+        return result
+
+    def get_methods(self) -> list[dict[str, str | int]]:
+        return self.CALCULATION_METHODS
 
     async def check_ready(self) -> bool:
         try:
@@ -180,7 +198,9 @@ class PrayerTimesService:
                 offset=meta_raw.get("offset"),
             ),
         )
+        response.current_prayer = self._detect_current_prayer(response)
         response.next_prayer = self._detect_next_prayer(response)
+        response.next_prayer_date = request.target_date if response.next_prayer else None
         return response
 
     def _map_calendar_payload(self, payload: dict, *, year: int, month: int) -> PrayerCalendarResponse:
@@ -204,6 +224,7 @@ class PrayerTimesService:
                     requested_date=parsed_date,
                     readable_date=date_raw.get("readable", parsed_date.isoformat()),
                     hijri_date=(date_raw.get("hijri") or {}).get("date", ""),
+                    weekday=parsed_date.strftime("%A"),
                     timings=PrayerTimings(
                         fajr=self._clean_time(timings_raw.get("Fajr")),
                         sunrise=self._clean_time(timings_raw.get("Sunrise")),
@@ -333,6 +354,33 @@ class PrayerTimesService:
             response.model_copy(deep=True),
         )
 
+    def _detect_current_prayer(self, response: PrayerTimesResponse) -> PrayerNameValue | None:
+        timezone = response.meta.timezone
+        if not timezone:
+            return None
+
+        try:
+            zone = ZoneInfo(timezone)
+        except ZoneInfoNotFoundError:
+            return None
+
+        now = datetime.now(zone)
+        prayer_sequence = [
+            ("isha", "Иша", response.timings.isha),
+            ("maghrib", "Магриб", response.timings.maghrib),
+            ("asr", "Аср", response.timings.asr),
+            ("dhuhr", "Зухр", response.timings.dhuhr),
+            ("fajr", "Фаджр", response.timings.fajr),
+        ]
+
+        for key, label, value in prayer_sequence:
+            if not value:
+                continue
+            prayer_time = self._build_prayer_datetime(response.requested_date, value, zone)
+            if prayer_time <= now:
+                return PrayerNameValue(key=key, label=label, time=value)
+        return None
+
     def _detect_next_prayer(self, response: PrayerTimesResponse) -> PrayerNameValue | None:
         timezone = response.meta.timezone
         if not timezone:
@@ -355,14 +403,41 @@ class PrayerTimesService:
         for key, label, value in prayer_sequence:
             if not value:
                 continue
-            hour, minute = map(int, value.split(":"))
-            prayer_time = datetime.combine(response.requested_date, datetime.min.time(), tzinfo=zone).replace(
-                hour=hour,
-                minute=minute,
-            )
+            prayer_time = self._build_prayer_datetime(response.requested_date, value, zone)
             if prayer_time >= now:
                 return PrayerNameValue(key=key, label=label, time=value)
         return None
+
+    @staticmethod
+    def _build_prayer_datetime(target_date: date, value: str, zone: ZoneInfo) -> datetime:
+        hour, minute = map(int, value.split(":"))
+        return datetime.combine(target_date, datetime.min.time(), tzinfo=zone).replace(hour=hour, minute=minute)
+
+    async def _resolve_timezone(self, latitude: float, longitude: float) -> str | None:
+        cache_key = (round(latitude, 3), round(longitude, 3))
+        cached = self._timezone_cache.get(cache_key)
+        if cached is not None:
+            expires_at, timezone = cached
+            if expires_at > monotonic():
+                return timezone
+            self._timezone_cache.pop(cache_key, None)
+
+        request = build_prayer_request(
+            latitude=latitude,
+            longitude=longitude,
+            method=2,
+            school=0,
+            target_date=date.today(),
+        )
+        try:
+            payload = await self._fetch_timings(request)
+            timezone = ((payload.get("data") or {}).get("meta") or {}).get("timezone")
+        except RuntimeError:
+            timezone = None
+
+        if timezone:
+            self._timezone_cache[cache_key] = (monotonic() + self.cache_ttl_seconds, timezone)
+        return timezone
 
     @staticmethod
     def _map_location_result(item: dict) -> LocationResult:
@@ -377,8 +452,10 @@ class PrayerTimesService:
         )
         country = address.get("country", "")
         return LocationResult(
+            id=str(item.get("place_id", f"{city}-{country}")),
             city=city,
             country=country,
+            region=address.get("state") or address.get("county"),
             display_name=item.get("display_name", f"{city}, {country}").strip(", "),
             latitude=float(item.get("lat", 0.0)),
             longitude=float(item.get("lon", 0.0)),

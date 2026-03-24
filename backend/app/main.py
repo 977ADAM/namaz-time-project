@@ -11,10 +11,14 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.schemas import (
+    ApiErrorBody,
+    ApiErrorResponse,
     AppMetaResponse,
+    CalculationMethod,
     ErrorResponse,
     HealthResponse,
     LocationSearchResponse,
+    MethodsResponse,
     PrayerCalendarResponse,
     PrayerTimesResponse,
     ReadinessResponse,
@@ -51,6 +55,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+def api_error(code: str, message: str, details: dict | None = None) -> dict:
+    return ApiErrorResponse(error=ApiErrorBody(code=code, message=message, details=details)).model_dump()
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allow_origins,
@@ -75,7 +84,13 @@ async def add_request_timing(request: Request, call_next):
 
 @app.exception_handler(RuntimeError)
 async def runtime_error_handler(_: Request, exc: RuntimeError) -> JSONResponse:
-    return JSONResponse(status_code=502, content={"detail": str(exc)})
+    return JSONResponse(status_code=502, content=api_error("UPSTREAM_BAD_RESPONSE", str(exc)))
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse:
+    code = "INVALID_INPUT" if exc.status_code == 400 else "INTERNAL_ERROR"
+    return JSONResponse(status_code=exc.status_code, content=api_error(code, str(exc.detail)))
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -101,18 +116,37 @@ async def app_meta() -> AppMetaResponse:
     )
 
 
-@app.get("/", response_model=None)
-async def home() -> HTMLResponse | dict[str, str]:
+def render_index() -> HTMLResponse | dict[str, str]:
     index_file = FRONTEND_DIR / "index.html"
     if index_file.exists():
         return HTMLResponse(index_file.read_text(encoding="utf-8"))
     return {"message": f"{settings.app_name} is running"}
 
 
+@app.get("/", response_model=None)
+async def home() -> HTMLResponse | dict[str, str]:
+    return render_index()
+
+
+@app.get("/monthly", response_model=None)
+async def monthly_page() -> HTMLResponse | dict[str, str]:
+    return render_index()
+
+
+@app.get("/settings", response_model=None)
+async def settings_page() -> HTMLResponse | dict[str, str]:
+    return render_index()
+
+
+@app.get("/about", response_model=None)
+async def about_page() -> HTMLResponse | dict[str, str]:
+    return render_index()
+
+
 @app.get(
     "/v1/prayer-times",
     response_model=PrayerTimesResponse,
-    responses={400: {"model": ErrorResponse}, 502: {"model": ErrorResponse}},
+    responses={400: {"model": ApiErrorResponse}, 502: {"model": ApiErrorResponse}},
 )
 async def get_prayer_times(
     latitude: float = Query(..., ge=-90, le=90, description="Latitude"),
@@ -135,9 +169,24 @@ async def get_prayer_times(
 
 
 @app.get(
+    "/api/v1/prayer-times/today",
+    response_model=PrayerTimesResponse,
+    responses={400: {"model": ApiErrorResponse}, 502: {"model": ApiErrorResponse}},
+)
+async def get_prayer_times_today(
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180),
+    method: int = Query(2),
+    date_value: date = Query(default_factory=date.today, alias="date"),
+    school: int = Query(0),
+) -> PrayerTimesResponse:
+    return await get_prayer_times(latitude=lat, longitude=lng, method=method, school=school, date_value=date_value)
+
+
+@app.get(
     "/v1/prayer-calendar",
     response_model=PrayerCalendarResponse,
-    responses={400: {"model": ErrorResponse}, 502: {"model": ErrorResponse}},
+    responses={400: {"model": ApiErrorResponse}, 502: {"model": ApiErrorResponse}},
 )
 async def get_prayer_calendar(
     latitude: float = Query(..., ge=-90, le=90, description="Latitude"),
@@ -161,9 +210,32 @@ async def get_prayer_calendar(
 
 
 @app.get(
+    "/api/v1/prayer-times/monthly",
+    response_model=PrayerCalendarResponse,
+    responses={400: {"model": ApiErrorResponse}, 502: {"model": ApiErrorResponse}},
+)
+async def get_prayer_times_monthly(
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180),
+    method: int = Query(2),
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    school: int = Query(0),
+) -> PrayerCalendarResponse:
+    return await get_prayer_calendar(
+        latitude=lat,
+        longitude=lng,
+        method=method,
+        school=school,
+        year=year,
+        month=month,
+    )
+
+
+@app.get(
     "/v1/locations/search",
     response_model=LocationSearchResponse,
-    responses={502: {"model": ErrorResponse}},
+    responses={502: {"model": ApiErrorResponse}},
 )
 async def search_locations(
     q: str = Query(..., min_length=2, description="City or place query"),
@@ -174,9 +246,21 @@ async def search_locations(
 
 
 @app.get(
+    "/api/v1/cities/search",
+    response_model=LocationSearchResponse,
+    responses={400: {"model": ApiErrorResponse}, 502: {"model": ApiErrorResponse}},
+)
+async def search_cities(
+    q: str = Query(..., min_length=2, description="City or place query"),
+    limit: int = Query(5, ge=1, le=10),
+) -> LocationSearchResponse:
+    return await search_locations(q=q, limit=limit)
+
+
+@app.get(
     "/v1/locations/reverse",
     response_model=LocationSearchResponse,
-    responses={400: {"model": ErrorResponse}, 502: {"model": ErrorResponse}},
+    responses={400: {"model": ApiErrorResponse}, 502: {"model": ApiErrorResponse}},
 )
 async def reverse_location(
     latitude: float = Query(..., ge=-90, le=90, description="Latitude"),
@@ -184,3 +268,21 @@ async def reverse_location(
 ) -> LocationSearchResponse:
     result = await service.reverse_geocode(latitude=latitude, longitude=longitude)
     return LocationSearchResponse(query=f"{latitude},{longitude}", results=[result])
+
+
+@app.get(
+    "/api/v1/location/reverse",
+    response_model=LocationSearchResponse,
+    responses={400: {"model": ApiErrorResponse}, 502: {"model": ApiErrorResponse}},
+)
+async def reverse_location_api(
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180),
+) -> LocationSearchResponse:
+    return await reverse_location(latitude=lat, longitude=lng)
+
+
+@app.get("/api/v1/config/methods", response_model=MethodsResponse)
+async def config_methods() -> MethodsResponse:
+    methods = [CalculationMethod(**item) for item in service.get_methods()]
+    return MethodsResponse(methods=methods)
