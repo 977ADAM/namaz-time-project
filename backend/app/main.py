@@ -1,40 +1,96 @@
+import logging
+import time
+from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.schemas import ErrorResponse, PrayerTimesResponse
+from app.config import settings
+from app.schemas import AppMetaResponse, ErrorResponse, HealthResponse, PrayerTimesResponse, ReadinessResponse
 from app.service import PrayerTimesService, build_prayer_request
 
-app = FastAPI(
-    title="Prayer Times API",
-    version="1.0.0",
-    description="Minimal MVP for fetching prayer times by coordinates and date.",
+logging.basicConfig(
+    level=getattr(logging, settings.log_level, logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+logger = logging.getLogger(__name__)
 
 service = PrayerTimesService()
 ROOT_DIR = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = ROOT_DIR / "frontend"
 STATIC_DIR = FRONTEND_DIR / "static"
 
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    logger.info("Starting %s in %s", settings.app_name, settings.environment)
+    try:
+        yield
+    finally:
+        await service.close()
+        logger.info("Stopped %s", settings.app_name)
+
+
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    description="Production-lite prayer times service built with FastAPI.",
+    debug=settings.debug,
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_allow_origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
-@app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+@app.middleware("http")
+async def add_request_timing(request: Request, call_next):
+    started_at = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+    response.headers["X-Process-Time-Ms"] = str(duration_ms)
+    logger.info("%s %s -> %s in %sms", request.method, request.url.path, response.status_code, duration_ms)
+    return response
+
+
+@app.exception_handler(RuntimeError)
+async def runtime_error_handler(_: Request, exc: RuntimeError) -> JSONResponse:
+    return JSONResponse(status_code=502, content={"detail": str(exc)})
+
+
+@app.get("/health", response_model=HealthResponse)
+async def health() -> HealthResponse:
+    return HealthResponse(status="ok")
+
+
+@app.get("/ready", response_model=ReadinessResponse)
+async def ready() -> ReadinessResponse:
+    upstream_status = "ok" if await service.check_ready() else "degraded"
+    status = "ok" if upstream_status == "ok" else "degraded"
+    return ReadinessResponse(status=status, checks={"app": "ok", "upstream_client": upstream_status})
+
+
+@app.get("/v1/meta", response_model=AppMetaResponse)
+async def app_meta() -> AppMetaResponse:
+    return AppMetaResponse(
+        app_name=settings.app_name,
+        version=settings.app_version,
+        environment=settings.environment,
+        docs_url="/docs",
+        openapi_url="/openapi.json",
+    )
 
 
 @app.get("/", response_model=None)
@@ -42,7 +98,7 @@ async def home() -> HTMLResponse | dict[str, str]:
     index_file = FRONTEND_DIR / "index.html"
     if index_file.exists():
         return HTMLResponse(index_file.read_text(encoding="utf-8"))
-    return {"message": "Prayer Times API is running"}
+    return {"message": f"{settings.app_name} is running"}
 
 
 @app.get(
@@ -68,5 +124,3 @@ async def get_prayer_times(
         return await service.get_prayer_times(request)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc

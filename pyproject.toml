@@ -1,7 +1,7 @@
 [project]
 name = "namaz-time-project"
-version = "0.1.0"
-description = "Prayer times MVP built with FastAPI"
+version = "0.2.0"
+description = "Production-lite prayer times service built with FastAPI"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.115.0",
@@ -15,4 +15,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = []
+package-dir = {"" = "backend"}
+
+[tool.setuptools.packages.find]
+where = ["backend"]

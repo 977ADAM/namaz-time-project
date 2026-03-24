@@ -21,12 +21,26 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
+        self.assertIn("X-Process-Time-Ms", response.headers)
+
+    async def test_ready_endpoint(self):
+        with patch("app.main.service.check_ready", AsyncMock(return_value=True)):
+            response = await self.client.get("/ready")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "ok")
+
+    async def test_meta_endpoint(self):
+        response = await self.client.get("/v1/meta")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["openapi_url"], "/openapi.json")
 
     async def test_root_serves_frontend(self):
         response = await self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Namaz Time MVP", response.text)
+        self.assertIn("Namaz Time API", response.text)
 
     async def test_prayer_times_endpoint(self):
         mocked_response = PrayerTimesResponse(

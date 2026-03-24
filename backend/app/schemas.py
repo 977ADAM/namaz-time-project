@@ -47,5 +47,22 @@ class PrayerTimesResponse(BaseModel):
     meta: PrayerMeta
 
 
+class HealthResponse(BaseModel):
+    status: str
+
+
+class ReadinessResponse(BaseModel):
+    status: str
+    checks: dict[str, str]
+
+
+class AppMetaResponse(BaseModel):
+    app_name: str
+    version: str
+    environment: str
+    docs_url: str
+    openapi_url: str
+
+
 class ErrorResponse(BaseModel):
     detail: str = Field(..., description="Human-readable error message")
