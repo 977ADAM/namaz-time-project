@@ -9,6 +9,9 @@
   --accent: #0f766e;
   --accent-alt: #c48b32;
   --shadow: 0 24px 70px rgba(43, 34, 17, 0.14);
+  --orb-one: rgba(15, 118, 110, 0.16);
+  --orb-two: rgba(196, 139, 50, 0.18);
+  --hero-glow: linear-gradient(135deg, rgba(15, 118, 110, 0.18), rgba(196, 139, 50, 0.16));
 }
 
 :root[data-theme="dark"] {
@@ -22,6 +25,33 @@
   --accent: #34c0b3;
   --accent-alt: #e6ad54;
   --shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+  --orb-one: rgba(52, 192, 179, 0.2);
+  --orb-two: rgba(230, 173, 84, 0.18);
+  --hero-glow: linear-gradient(135deg, rgba(52, 192, 179, 0.18), rgba(230, 173, 84, 0.16));
+}
+
+:root[data-phase="dawn"] {
+  --orb-one: rgba(103, 126, 234, 0.22);
+  --orb-two: rgba(247, 174, 101, 0.18);
+  --hero-glow: linear-gradient(135deg, rgba(103, 126, 234, 0.18), rgba(247, 174, 101, 0.16));
+}
+
+:root[data-phase="day"] {
+  --orb-one: rgba(28, 165, 143, 0.18);
+  --orb-two: rgba(233, 196, 106, 0.16);
+  --hero-glow: linear-gradient(135deg, rgba(28, 165, 143, 0.16), rgba(233, 196, 106, 0.14));
+}
+
+:root[data-phase="sunset"] {
+  --orb-one: rgba(255, 125, 95, 0.24);
+  --orb-two: rgba(129, 114, 255, 0.18);
+  --hero-glow: linear-gradient(135deg, rgba(255, 125, 95, 0.18), rgba(129, 114, 255, 0.16));
+}
+
+:root[data-phase="night"] {
+  --orb-one: rgba(65, 114, 196, 0.2);
+  --orb-two: rgba(93, 72, 176, 0.16);
+  --hero-glow: linear-gradient(135deg, rgba(65, 114, 196, 0.18), rgba(93, 72, 176, 0.16));
 }
 
 * {
@@ -38,11 +68,12 @@ body {
   position: relative;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.16), transparent 25%),
-    radial-gradient(circle at bottom right, rgba(196, 139, 50, 0.18), transparent 28%),
+    radial-gradient(circle at top left, var(--orb-one), transparent 25%),
+    radial-gradient(circle at bottom right, var(--orb-two), transparent 28%),
     linear-gradient(180deg, var(--bg) 0%, var(--bg-alt) 100%);
   color: var(--ink);
   font-family: "Manrope", sans-serif;
+  transition: background 900ms ease, color 400ms ease;
 }
 
 a {
@@ -69,13 +100,13 @@ select {
 .background-orb-one {
   top: -8rem;
   left: -8rem;
-  background: var(--accent);
+  background: color-mix(in srgb, var(--accent) 72%, white 28%);
 }
 
 .background-orb-two {
   right: -10rem;
   bottom: -12rem;
-  background: var(--accent-alt);
+  background: color-mix(in srgb, var(--accent-alt) 68%, white 32%);
 }
 
 .shell {
@@ -396,8 +427,11 @@ button:hover {
   border-radius: 28px;
   background:
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.45), transparent 28%),
-    linear-gradient(135deg, rgba(15, 118, 110, 0.18), rgba(196, 139, 50, 0.16));
+    var(--hero-glow);
   border: 1px solid var(--line);
+  position: relative;
+  overflow: hidden;
+  animation: heroFloat 8s ease-in-out infinite;
 }
 
 .hero-prayer-top {
@@ -428,6 +462,7 @@ button:hover {
   font-size: clamp(2.2rem, 8vw, 5rem);
   font-weight: 800;
   letter-spacing: 0.04em;
+  animation: countdownPulse 2.8s ease-in-out infinite;
 }
 
 .hero-status {
@@ -448,16 +483,31 @@ button:hover {
   border-radius: inherit;
   background: linear-gradient(90deg, var(--accent), var(--accent-alt));
   transition: width 800ms ease;
+  position: relative;
+}
+
+.hero-progress-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: shimmer 2.4s linear infinite;
 }
 
 .timing-card-current {
   border-color: rgba(15, 118, 110, 0.45);
   box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.2);
+  animation: currentGlow 2.8s ease-in-out infinite;
 }
 
 .timing-card-next {
   border-color: rgba(196, 139, 50, 0.45);
   box-shadow: inset 0 0 0 1px rgba(196, 139, 50, 0.2);
+  animation: nextDrift 4.5s ease-in-out infinite;
+}
+
+.hero-prayer-card-burst {
+  animation: heroBurst 850ms ease;
 }
 
 .metric-label {
@@ -544,6 +594,76 @@ button:hover {
 .month-current {
   text-align: center;
   font-weight: 800;
+}
+
+@keyframes heroFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes countdownPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.012);
+    opacity: 0.92;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(180%);
+  }
+}
+
+@keyframes currentGlow {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 1px rgba(15, 118, 110, 0.2),
+      0 0 0 rgba(15, 118, 110, 0);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1px rgba(15, 118, 110, 0.3),
+      0 12px 26px rgba(15, 118, 110, 0.14);
+  }
+}
+
+@keyframes nextDrift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes heroBurst {
+  0% {
+    transform: scale(0.985);
+    filter: saturate(1.08);
+  }
+  60% {
+    transform: scale(1.01);
+    filter: saturate(1.2);
+  }
+  100% {
+    transform: scale(1);
+    filter: saturate(1);
+  }
 }
 
 @media (max-width: 980px) {

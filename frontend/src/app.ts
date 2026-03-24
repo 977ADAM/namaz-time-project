@@ -78,6 +78,7 @@ function updateCountdown(state: AppState, elements: AppElements): void {
   const { current, next } = getPrayerState(state.today, state.tomorrow);
   state.liveCurrentPrayer = current;
   state.liveNextPrayer = next;
+  applyAtmosphere(current, next);
 
   if (current) {
     elements.currentPrayerName.textContent = current.label;
@@ -133,6 +134,7 @@ function updateCountdown(state: AppState, elements: AppElements): void {
     liveStatus: buildLiveStatus(current, next, totalSeconds),
     progressPercent: calculateProgressPercent(current, next),
   });
+  maybeAnimatePrayerTransition(state, elements, current, next);
   maybeSendPrayerNotification(state, current);
   renderTodayTimings(state, elements);
 }
@@ -310,6 +312,50 @@ function maybeSendPrayerNotification(state: AppState, current: PrayerMoment | nu
   new Notification("Namaz Time", { body, tag: notificationKey });
 }
 
+function applyAtmosphere(current: PrayerMoment | null, next: PrayerMoment | null): void {
+  const phase = resolvePhase(current, next);
+  document.documentElement.dataset.phase = phase;
+}
+
+function resolvePhase(current: PrayerMoment | null, next: PrayerMoment | null): string {
+  const anchor = current?.key ?? next?.key;
+  switch (anchor) {
+    case "fajr":
+      return "dawn";
+    case "dhuhr":
+    case "asr":
+      return "day";
+    case "maghrib":
+      return "sunset";
+    case "isha":
+      return "night";
+    default:
+      return "dawn";
+  }
+}
+
+function maybeAnimatePrayerTransition(
+  state: AppState,
+  elements: AppElements,
+  current: PrayerMoment | null,
+  next: PrayerMoment | null
+): void {
+  const visualKey = `${current?.key ?? "none"}-${next?.key ?? "none"}-${next?.date ?? "none"}`;
+  if (!state.lastVisualPrayerKey) {
+    state.lastVisualPrayerKey = visualKey;
+    return;
+  }
+  if (state.lastVisualPrayerKey === visualKey) {
+    return;
+  }
+
+  state.lastVisualPrayerKey = visualKey;
+  elements.heroPrayerCard.classList.remove("hero-prayer-card-burst");
+  window.requestAnimationFrame(() => {
+    elements.heroPrayerCard.classList.add("hero-prayer-card-burst");
+  });
+}
+
 async function enableNotifications(state: AppState, elements: AppElements): Promise<void> {
   if (!("Notification" in window)) {
     elements.notificationStatus.textContent = "Этот браузер не поддерживает уведомления.";
@@ -392,5 +438,9 @@ function bindEvents(state: AppState, elements: AppElements): void {
     if (state.theme === "system") {
       setTheme(state);
     }
+  });
+
+  elements.heroPrayerCard.addEventListener("animationend", () => {
+    elements.heroPrayerCard.classList.remove("hero-prayer-card-burst");
   });
 }

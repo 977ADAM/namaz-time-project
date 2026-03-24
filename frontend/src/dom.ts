@@ -8,6 +8,7 @@ export interface AppElements {
   favoritesList: HTMLDivElement;
   favoriteToggleButton: HTMLButtonElement;
   status: HTMLParagraphElement;
+  heroPrayerCard: HTMLElement;
   heroPrayerName: HTMLElement;
   heroPrayerTime: HTMLParagraphElement;
   heroCountdown: HTMLElement;
@@ -62,6 +63,7 @@ export function getElements(): AppElements {
     favoritesList: queryRequired<HTMLDivElement>("#favorites-list"),
     favoriteToggleButton: queryRequired<HTMLButtonElement>("#favorite-toggle-button"),
     status: queryRequired<HTMLParagraphElement>("#status"),
+    heroPrayerCard: queryRequired<HTMLElement>("#hero-prayer-card"),
     heroPrayerName: queryRequired<HTMLElement>("#hero-prayer-name"),
     heroPrayerTime: queryRequired<HTMLParagraphElement>("#hero-prayer-time"),
     heroCountdown: queryRequired<HTMLElement>("#hero-countdown"),

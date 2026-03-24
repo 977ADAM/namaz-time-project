@@ -21,6 +21,7 @@ export interface AppState {
   debounceTimer: number | null;
   countdownTimer: number | null;
   lastCurrentPrayerKey: string | null;
+  lastVisualPrayerKey: string | null;
 }
 
 export function createAppState(): AppState {
@@ -43,5 +44,6 @@ export function createAppState(): AppState {
     debounceTimer: null,
     countdownTimer: null,
     lastCurrentPrayerKey: null,
+    lastVisualPrayerKey: null,
   };
 }
