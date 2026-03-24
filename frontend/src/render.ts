@@ -178,9 +178,8 @@ export function renderQuickPresets(
       button.classList.add("preset-card-empty");
     }
     button.innerHTML = `
-      <span class="preset-label">${getPresetLabel(state, preset)}</span>
-      <strong class="preset-title">${preset.location?.city || t(state.language, "preset.saveCurrent")}</strong>
-      <small class="preset-meta">${preset.location?.country || t(state.language, "preset.assignCurrent")}</small>
+      <span class="preset-chip-name">${getPresetLabel(state, preset)}</span>
+      <strong class="preset-chip-value">${preset.location?.city || t(state.language, "preset.saveCurrent")}</strong>
     `;
     button.addEventListener("click", () => {
       void onSelect(preset);

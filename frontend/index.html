@@ -46,20 +46,11 @@
         </nav>
       </header>
 
-      <section class="hero-panel">
-        <div class="hero-copy">
-          <p class="eyebrow" data-i18n="hero.eyebrow">Production-ready prayer times</p>
-          <h1 data-i18n="hero.title">Актуальные времена намаза для вашего города.</h1>
-          <p class="hero-text" data-i18n="hero.text">
-            Определяйте местоположение автоматически или выбирайте город вручную, чтобы увидеть
-            расписание на сегодня, следующий намаз и календарь на месяц.
-          </p>
-        </div>
-
-        <aside class="search-panel">
-          <form id="city-form" class="city-form">
+      <section class="panel topbar-panel">
+        <div class="topbar-row">
+          <form id="city-form" class="city-form city-form-inline">
             <label for="city-query" data-i18n="search.city">Город</label>
-            <div class="search-row">
+            <div class="search-row search-row-inline">
               <input
                 id="city-query"
                 type="text"
@@ -71,30 +62,35 @@
             </div>
           </form>
 
-          <div class="toolbar">
+          <div class="toolbar toolbar-inline">
             <button id="locate-button" type="button" class="secondary-button" data-i18n="search.locate">
               Определить местоположение
             </button>
             <button id="retry-button" type="button" class="ghost-button" data-i18n="search.retry">Повторить загрузку</button>
-          </div>
-
-          <div class="favorites-head">
-            <span class="metric-label" data-i18n="favorites.title">Избранные города</span>
             <button id="favorite-toggle-button" type="button" class="ghost-button compact-button">
               В избранное
             </button>
           </div>
-          <div id="favorites-list" class="favorites-list" aria-live="polite"></div>
+        </div>
 
-          <div class="favorites-head quick-presets-head">
-            <span class="metric-label" data-i18n="presets.title">Быстрые пресеты</span>
-            <span class="panel-meta compact-meta" data-i18n="presets.meta">Дом, Работа, Путешествие</span>
+        <div class="topbar-meta">
+          <div class="favorites-block">
+            <div class="favorites-head compact-head">
+              <span class="metric-label" data-i18n="favorites.title">Избранные города</span>
+            </div>
+            <div id="favorites-list" class="favorites-list" aria-live="polite"></div>
           </div>
-          <div id="quick-presets-list" class="quick-presets-list" aria-live="polite"></div>
 
-          <div id="search-status" class="search-status" aria-live="polite"></div>
-          <div id="search-results" class="search-results" aria-live="polite"></div>
-        </aside>
+          <div class="presets-block">
+            <div class="favorites-head quick-presets-head compact-head">
+              <span class="metric-label" data-i18n="presets.title">Быстрые пресеты</span>
+            </div>
+            <div id="quick-presets-list" class="quick-presets-list" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div id="search-status" class="search-status" aria-live="polite"></div>
+        <div id="search-results" class="search-results" aria-live="polite"></div>
       </section>
 
       <section id="route-home" class="route-section active">
