@@ -5,10 +5,14 @@ import { getElements } from "./dom";
 import { formatTime } from "./formatters";
 import { getPrayerState } from "./prayer";
 import {
+  renderFavoriteCities,
+  renderFavoriteToggle,
+  renderHeroState,
   renderDates,
   renderLocation,
   renderMonthlyMeta,
   renderMonthlyTable,
+  renderNotifications,
   renderSearchResults,
   renderTodayMeta,
   renderTodayTimings,
@@ -18,8 +22,8 @@ import {
 } from "./render";
 import { navigate, setRoute } from "./router";
 import { createAppState, type AppState } from "./state";
-import { saveLocation, writeSetting } from "./storage";
-import type { LocationResult } from "./types";
+import { saveFavoriteLocations, saveLocation, writeSetting } from "./storage";
+import type { LocationResult, PrayerMoment } from "./types";
 
 export function initApp(): void {
   const state = createAppState();
@@ -64,11 +68,16 @@ function renderAll(state: AppState, elements: AppElements): void {
   renderTodayTimings(state, elements);
   renderMonthlyMeta(state, elements);
   renderMonthlyTable(state, elements);
+  renderFavoriteCities(state, elements, async (location) => applyLocation(state, elements, location));
+  renderFavoriteToggle(state, elements);
+  renderNotifications(state, elements);
   syncSettings(state, elements);
 }
 
 function updateCountdown(state: AppState, elements: AppElements): void {
   const { current, next } = getPrayerState(state.today, state.tomorrow);
+  state.liveCurrentPrayer = current;
+  state.liveNextPrayer = next;
 
   if (current) {
     elements.currentPrayerName.textContent = current.label;
@@ -83,6 +92,13 @@ function updateCountdown(state: AppState, elements: AppElements): void {
     elements.nextPrayerTime.textContent = "Нужны данные на следующий день";
     elements.countdownValue.textContent = "--:--:--";
     elements.countdownMeta.textContent = "Нет данных";
+    renderHeroState(state, elements, {
+      current,
+      next,
+      countdown: "--:--:--",
+      liveStatus: "Ожидаем данные для следующего намаза.",
+      progressPercent: 0,
+    });
     return;
   }
 
@@ -93,6 +109,13 @@ function updateCountdown(state: AppState, elements: AppElements): void {
   if (diffMs <= 0) {
     elements.countdownValue.textContent = "00:00:00";
     elements.countdownMeta.textContent = "Пересчитываем...";
+    renderHeroState(state, elements, {
+      current,
+      next,
+      countdown: "00:00:00",
+      liveStatus: "Время намаза наступает прямо сейчас.",
+      progressPercent: 100,
+    });
     return;
   }
 
@@ -100,8 +123,18 @@ function updateCountdown(state: AppState, elements: AppElements): void {
   const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
   const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
   const seconds = String(totalSeconds % 60).padStart(2, "0");
-  elements.countdownValue.textContent = `${hours}:${minutes}:${seconds}`;
+  const countdown = `${hours}:${minutes}:${seconds}`;
+  elements.countdownValue.textContent = countdown;
   elements.countdownMeta.textContent = "До следующего намаза";
+  renderHeroState(state, elements, {
+    current,
+    next,
+    countdown,
+    liveStatus: buildLiveStatus(current, next, totalSeconds),
+    progressPercent: calculateProgressPercent(current, next),
+  });
+  maybeSendPrayerNotification(state, current);
+  renderTodayTimings(state, elements);
 }
 
 function startCountdown(state: AppState, elements: AppElements): void {
@@ -151,6 +184,7 @@ async function applyLocation(state: AppState, elements: AppElements, location: L
   saveLocation(state.location);
   renderLocation(state, elements);
   syncSettings(state, elements);
+  renderFavoriteToggle(state, elements);
   await loadPrayerData(state, elements);
 }
 
@@ -217,6 +251,79 @@ function shiftMonth(state: AppState, elements: AppElements, offset: number): voi
   });
 }
 
+function toggleFavorite(state: AppState, elements: AppElements): void {
+  const exists = state.favorites.some((item) => item.id === state.location.id);
+  if (exists) {
+    state.favorites = state.favorites.filter((item) => item.id !== state.location.id);
+    setSearchStatus(elements, "Город удалён из избранного.");
+  } else {
+    state.favorites = [state.location, ...state.favorites.filter((item) => item.id !== state.location.id)].slice(0, 6);
+    setSearchStatus(elements, "Город добавлен в избранное.");
+  }
+  saveFavoriteLocations(state.favorites);
+  renderFavoriteCities(state, elements, async (location) => applyLocation(state, elements, location));
+  renderFavoriteToggle(state, elements);
+}
+
+function buildLiveStatus(current: PrayerMoment | null, next: PrayerMoment | null, totalSeconds: number): string {
+  if (!current && next) {
+    return `До первого намаза сегодня осталось ${Math.ceil(totalSeconds / 60)} мин.`;
+  }
+  if (current && next) {
+    return `Сейчас идёт ${current.label}. До ${next.label} осталось ${Math.ceil(totalSeconds / 60)} мин.`;
+  }
+  if (current) {
+    return `Сейчас идёт ${current.label}.`;
+  }
+  return "Ожидаем время следующего намаза.";
+}
+
+function calculateProgressPercent(current: PrayerMoment | null, next: PrayerMoment | null): number {
+  if (!next) {
+    return 0;
+  }
+  const now = Date.now();
+  const currentStart = current ? current.datetime.getTime() : next.datetime.getTime() - 1000 * 60 * 90;
+  const total = next.datetime.getTime() - currentStart;
+  if (total <= 0) {
+    return 100;
+  }
+  const progress = ((now - currentStart) / total) * 100;
+  return Math.min(100, Math.max(0, progress));
+}
+
+function maybeSendPrayerNotification(state: AppState, current: PrayerMoment | null): void {
+  if (!state.notificationsEnabled || !current || !("Notification" in window) || Notification.permission !== "granted") {
+    return;
+  }
+
+  const notificationKey = `${current.key}-${current.date}`;
+  if (!state.lastCurrentPrayerKey) {
+    state.lastCurrentPrayerKey = notificationKey;
+    return;
+  }
+
+  if (state.lastCurrentPrayerKey === notificationKey) {
+    return;
+  }
+
+  state.lastCurrentPrayerKey = notificationKey;
+  const body = `Наступило время намаза ${current.label}.`;
+  new Notification("Namaz Time", { body, tag: notificationKey });
+}
+
+async function enableNotifications(state: AppState, elements: AppElements): Promise<void> {
+  if (!("Notification" in window)) {
+    elements.notificationStatus.textContent = "Этот браузер не поддерживает уведомления.";
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+  state.notificationsEnabled = permission === "granted";
+  writeSetting(STORAGE_KEYS.notificationsEnabled, String(state.notificationsEnabled));
+  renderNotifications(state, elements);
+}
+
 function bindEvents(state: AppState, elements: AppElements): void {
   elements.cityForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -230,6 +337,7 @@ function bindEvents(state: AppState, elements: AppElements): void {
   });
 
   elements.locateButton.addEventListener("click", () => detectLocation(state, elements));
+  elements.favoriteToggleButton.addEventListener("click", () => toggleFavorite(state, elements));
   elements.retryButton.addEventListener("click", () => {
     void loadPrayerData(state, elements).catch((error: unknown) => {
       setStatus(elements, error instanceof Error ? error.message : "Ошибка загрузки");
@@ -268,6 +376,10 @@ function bindEvents(state: AppState, elements: AppElements): void {
     renderTodayTimings(state, elements);
     renderMonthlyTable(state, elements);
     updateCountdown(state, elements);
+  });
+
+  elements.notificationButton.addEventListener("click", () => {
+    void enableNotifications(state, elements);
   });
 
   elements.navLinks.forEach((link) => {

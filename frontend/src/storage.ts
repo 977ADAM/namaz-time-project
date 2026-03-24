@@ -13,6 +13,18 @@ export function saveLocation(location: LocationResult): void {
   localStorage.setItem(STORAGE_KEYS.selectedCity, JSON.stringify(location));
 }
 
+export function loadFavoriteLocations(): LocationResult[] {
+  try {
+    return (JSON.parse(localStorage.getItem(STORAGE_KEYS.favoriteCities) ?? "[]") as LocationResult[]) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveFavoriteLocations(locations: LocationResult[]): void {
+  localStorage.setItem(STORAGE_KEYS.favoriteCities, JSON.stringify(locations));
+}
+
 export function readSetting(key: string, fallback: string): string {
   return localStorage.getItem(key) || fallback;
 }

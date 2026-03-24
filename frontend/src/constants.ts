@@ -2,11 +2,13 @@ import type { LocationResult } from "./types";
 
 export const STORAGE_KEYS = {
   selectedCity: "selectedCity",
+  favoriteCities: "favoriteCities",
   calculationMethod: "calculationMethod",
   language: "language",
   theme: "theme",
   timeFormat: "timeFormat",
   school: "school",
+  notificationsEnabled: "notificationsEnabled",
 } as const;
 
 export const DEFAULT_LOCATION: LocationResult = {

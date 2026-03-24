@@ -74,6 +74,14 @@
             <button id="retry-button" type="button" class="ghost-button">Повторить загрузку</button>
           </div>
 
+          <div class="favorites-head">
+            <span class="metric-label">Избранные города</span>
+            <button id="favorite-toggle-button" type="button" class="ghost-button compact-button">
+              В избранное
+            </button>
+          </div>
+          <div id="favorites-list" class="favorites-list" aria-live="polite"></div>
+
           <div id="search-status" class="search-status" aria-live="polite"></div>
           <div id="search-results" class="search-results" aria-live="polite"></div>
         </aside>
@@ -89,6 +97,21 @@
               </div>
               <p id="today-meta" class="panel-meta">После выбора локации покажем актуальные данные.</p>
             </div>
+
+            <article class="hero-prayer-card">
+              <div class="hero-prayer-top">
+                <div>
+                  <span class="metric-label">Ближайший намаз</span>
+                  <strong id="hero-prayer-name" class="hero-prayer-name">Нет данных</strong>
+                </div>
+                <span id="hero-prayer-time" class="hero-prayer-time">Выберите город</span>
+              </div>
+              <div id="hero-countdown" class="hero-countdown">--:--:--</div>
+              <p id="hero-status" class="hero-status">После загрузки покажем живой статус времени намаза.</p>
+              <div class="hero-progress-track" aria-hidden="true">
+                <div id="hero-progress-bar" class="hero-progress-bar"></div>
+              </div>
+            </article>
 
             <div class="summary-grid">
               <article class="metric-card accent">
@@ -222,6 +245,13 @@
                 <option value="12h">12 часов</option>
               </select>
             </label>
+            <div class="field notifications-field">
+              <span>Уведомления</span>
+              <button id="notifications-button" type="button" class="secondary-button">
+                Включить уведомления
+              </button>
+              <p id="notifications-status" class="panel-meta">Разрешение пока не выдано.</p>
+            </div>
           </div>
         </section>
       </section>

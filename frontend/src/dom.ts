@@ -5,7 +5,14 @@ export interface AppElements {
   retryButton: HTMLButtonElement;
   searchStatus: HTMLDivElement;
   searchResults: HTMLDivElement;
+  favoritesList: HTMLDivElement;
+  favoriteToggleButton: HTMLButtonElement;
   status: HTMLParagraphElement;
+  heroPrayerName: HTMLElement;
+  heroPrayerTime: HTMLParagraphElement;
+  heroCountdown: HTMLElement;
+  heroStatus: HTMLParagraphElement;
+  heroProgressBar: HTMLDivElement;
   todayTitle: HTMLHeadingElement;
   todayMeta: HTMLParagraphElement;
   todayTimes: HTMLDivElement;
@@ -30,6 +37,8 @@ export interface AppElements {
   settingsLanguage: HTMLSelectElement;
   settingsTheme: HTMLSelectElement;
   settingsTimeFormat: HTMLSelectElement;
+  notificationButton: HTMLButtonElement;
+  notificationStatus: HTMLParagraphElement;
   navLinks: HTMLAnchorElement[];
   routeSections: HTMLElement[];
 }
@@ -50,7 +59,14 @@ export function getElements(): AppElements {
     retryButton: queryRequired<HTMLButtonElement>("#retry-button"),
     searchStatus: queryRequired<HTMLDivElement>("#search-status"),
     searchResults: queryRequired<HTMLDivElement>("#search-results"),
+    favoritesList: queryRequired<HTMLDivElement>("#favorites-list"),
+    favoriteToggleButton: queryRequired<HTMLButtonElement>("#favorite-toggle-button"),
     status: queryRequired<HTMLParagraphElement>("#status"),
+    heroPrayerName: queryRequired<HTMLElement>("#hero-prayer-name"),
+    heroPrayerTime: queryRequired<HTMLParagraphElement>("#hero-prayer-time"),
+    heroCountdown: queryRequired<HTMLElement>("#hero-countdown"),
+    heroStatus: queryRequired<HTMLParagraphElement>("#hero-status"),
+    heroProgressBar: queryRequired<HTMLDivElement>("#hero-progress-bar"),
     todayTitle: queryRequired<HTMLHeadingElement>("#today-title"),
     todayMeta: queryRequired<HTMLParagraphElement>("#today-meta"),
     todayTimes: queryRequired<HTMLDivElement>("#today-times"),
@@ -75,6 +91,8 @@ export function getElements(): AppElements {
     settingsLanguage: queryRequired<HTMLSelectElement>("#settings-language"),
     settingsTheme: queryRequired<HTMLSelectElement>("#settings-theme"),
     settingsTimeFormat: queryRequired<HTMLSelectElement>("#settings-time-format"),
+    notificationButton: queryRequired<HTMLButtonElement>("#notifications-button"),
+    notificationStatus: queryRequired<HTMLParagraphElement>("#notifications-status"),
     navLinks: Array.from(document.querySelectorAll<HTMLAnchorElement>("[data-nav]")),
     routeSections: Array.from(document.querySelectorAll<HTMLElement>(".route-section")),
   };

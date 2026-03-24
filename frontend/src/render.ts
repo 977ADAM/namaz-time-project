@@ -2,7 +2,7 @@ import { PRAYER_LABELS, WEEKDAYS } from "./constants";
 import type { AppElements } from "./dom";
 import { formatMonthYear, formatTime } from "./formatters";
 import type { AppState } from "./state";
-import type { LocationResult } from "./types";
+import type { LocationResult, PrayerMoment } from "./types";
 
 export function setStatus(elements: AppElements, message: string): void {
   elements.status.textContent = message;
@@ -37,9 +37,17 @@ export function renderTodayTimings(state: AppState, elements: AppElements): void
     return;
   }
 
+  const currentKey = state.liveCurrentPrayer?.key;
+  const nextKey = state.liveNextPrayer?.key;
+
   Object.entries(state.today.timings).forEach(([key, rawTime]) => {
     const card = document.createElement("article");
     card.className = "timing-card";
+    if (key === currentKey) {
+      card.classList.add("timing-card-current");
+    } else if (key === nextKey) {
+      card.classList.add("timing-card-next");
+    }
     card.innerHTML = `
       <span class="timing-name">${PRAYER_LABELS[key as keyof typeof PRAYER_LABELS] || key}</span>
       <strong class="timing-value">${formatTime(rawTime, state.timeFormat)}</strong>
@@ -110,6 +118,73 @@ export function renderSearchResults(
     });
     elements.searchResults.appendChild(button);
   });
+}
+
+export function renderFavoriteCities(
+  state: AppState,
+  elements: AppElements,
+  onSelect: (location: LocationResult) => void | Promise<void>
+): void {
+  elements.favoritesList.innerHTML = "";
+  if (!state.favorites.length) {
+    elements.favoritesList.innerHTML = `<div class="empty-state compact">Добавьте город в избранное для быстрого переключения.</div>`;
+    return;
+  }
+
+  state.favorites.forEach((location) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "favorite-chip";
+    if (location.id === state.location.id) {
+      button.classList.add("favorite-chip-active");
+    }
+    button.textContent = location.city;
+    button.addEventListener("click", () => {
+      void onSelect(location);
+    });
+    elements.favoritesList.appendChild(button);
+  });
+}
+
+export function renderFavoriteToggle(state: AppState, elements: AppElements): void {
+  const isFavorite = state.favorites.some((item) => item.id === state.location.id);
+  elements.favoriteToggleButton.textContent = isFavorite ? "Убрать из избранного" : "В избранное";
+}
+
+export function renderHeroState(
+  state: AppState,
+  elements: AppElements,
+  payload: {
+    current: PrayerMoment | null;
+    next: PrayerMoment | null;
+    countdown: string;
+    liveStatus: string;
+    progressPercent: number;
+  }
+): void {
+  elements.heroPrayerName.textContent = payload.next?.label || "Нет данных";
+  elements.heroPrayerTime.textContent = payload.next
+    ? `${payload.next.date === state.today?.requested_date ? "Сегодня" : "Завтра"} в ${formatTime(payload.next.time, state.timeFormat)}`
+    : "Выберите город";
+  elements.heroCountdown.textContent = payload.countdown;
+  elements.heroStatus.textContent = payload.liveStatus;
+  elements.heroProgressBar.style.width = `${payload.progressPercent}%`;
+}
+
+export function renderNotifications(state: AppState, elements: AppElements): void {
+  const permission = "Notification" in window ? Notification.permission : "unsupported";
+  elements.notificationButton.textContent = state.notificationsEnabled
+    ? "Уведомления включены"
+    : "Включить уведомления";
+  const permissionText =
+    permission === "granted"
+      ? "Браузерные уведомления разрешены."
+      : permission === "denied"
+        ? "Браузер заблокировал уведомления."
+        : permission === "unsupported"
+          ? "Этот браузер не поддерживает уведомления."
+          : "Разрешение пока не выдано.";
+  elements.notificationStatus.textContent = permissionText;
 }
 
 export function syncSettings(state: AppState, elements: AppElements): void {
