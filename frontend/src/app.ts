@@ -89,7 +89,7 @@ function renderAll(state: AppState, elements: AppElements): void {
   renderMonthlyTable(state, elements);
   renderFavoriteCities(state, elements, async (location) => applyLocation(state, elements, location));
   renderQuickPresets(state, elements, async (preset) => handleQuickPreset(state, elements, preset));
-  renderCityComparisons(state.cityComparisons, elements, async (presetId) => selectPresetById(state, elements, presetId));
+  renderCityComparisons(state, state.cityComparisons, elements, async (presetId) => selectPresetById(state, elements, presetId));
   renderFavoriteToggle(state, elements);
   renderNotifications(state, elements);
   renderInstallState(state, elements);
@@ -218,7 +218,7 @@ async function loadPrayerData(state: AppState, elements: AppElements): Promise<v
   const todayValue = getIsoDateInTimezone(activeTimezone);
   const tomorrowValue = shiftIsoDate(todayValue, 1);
 
-  setStatus(elements, "Загружаем времена намаза...");
+  setStatus(elements, t(state.language, "status.loadingPrayerTimes"));
   const [todayPayload, tomorrowPayload, monthlyPayload] = await loadPrayerBundle({
     latitude: state.location.latitude,
     longitude: state.location.longitude,
@@ -241,7 +241,7 @@ async function loadPrayerData(state: AppState, elements: AppElements): Promise<v
 
   renderAll(state, elements);
   startCountdown(state, elements);
-  setStatus(elements, "Данные обновлены.");
+  setStatus(elements, t(state.language, "status.dataUpdated"));
 }
 
 async function applyLocation(state: AppState, elements: AppElements, location: LocationResult): Promise<void> {
@@ -267,7 +267,7 @@ async function handleQuickPreset(state: AppState, elements: AppElements, preset:
       persistNotificationSettings(state);
     }
     await applyLocation(state, elements, preset.location);
-    setSearchStatus(elements, `Быстро переключились на пресет «${preset.label}».`);
+    setSearchStatus(elements, `${t(state.language, `preset.${preset.id}`)}.`);
     return;
   }
 
@@ -284,7 +284,7 @@ async function handleQuickPreset(state: AppState, elements: AppElements, preset:
   updateActivePresetId(state);
   await refreshCityComparisons(state);
   renderAll(state, elements);
-  setSearchStatus(elements, `Текущий город сохранён в пресет «${preset.label}».`);
+  setSearchStatus(elements, `${t(state.language, `preset.${preset.id}`)}.`);
 }
 
 async function refreshCityComparisons(state: AppState): Promise<void> {
@@ -294,7 +294,7 @@ async function refreshCityComparisons(state: AppState): Promise<void> {
     return;
   }
 
-  const comparisons = await Promise.all(
+  const comparisons = await Promise.allSettled(
     presets.map(async (preset) => {
       const location = preset.location!;
       const payload =
@@ -311,7 +311,9 @@ async function refreshCityComparisons(state: AppState): Promise<void> {
     })
   );
 
-  state.cityComparisons = comparisons;
+  state.cityComparisons = comparisons
+    .filter((result): result is PromiseFulfilledResult<CityComparison> => result.status === "fulfilled")
+    .map((result) => result.value);
 }
 
 function buildCityComparison(state: AppState, preset: QuickPreset, payload: Awaited<ReturnType<typeof loadPrayerTimesForLocation>>): CityComparison {
@@ -329,9 +331,9 @@ function buildCityComparison(state: AppState, preset: QuickPreset, payload: Awai
     presetLabel: t(state.language, `preset.${preset.id}`),
     city: payload.location.city,
     timezone,
-    nextPrayerLabel: nextPrayer?.label || "Нет данных",
+    nextPrayerLabel: nextPrayer?.label || t(state.language, "status.noData"),
     nextPrayerTime: nextPrayer ? formatTime(nextPrayer.time, state.timeFormat) : "--",
-    countdownLabel: diffSeconds ? `${hours}:${minutes}` : "сейчас",
+    countdownLabel: diffSeconds ? `${hours}:${minutes}` : t(state.language, "notification.lead.instant"),
     isActive: preset.location?.id === state.location.id,
   };
 }
@@ -340,18 +342,18 @@ async function handleSearch(state: AppState, elements: AppElements, query: strin
   const normalized = query.trim();
   if (normalized.length < 2) {
     elements.searchResults.innerHTML = "";
-    setSearchStatus(elements, "Введите минимум 2 символа.");
+    setSearchStatus(elements, t(state.language, "search.minChars"));
     return;
   }
 
-  setSearchStatus(elements, "Ищем города...");
+  setSearchStatus(elements, t(state.language, "search.loading"));
   const payload = await searchCities(normalized, 5);
-  renderSearchResults(payload.results, elements, async (result) => {
+  renderSearchResults(state, payload.results, elements, async (result) => {
     await applyLocation(state, elements, result);
     elements.searchResults.innerHTML = "";
-    setSearchStatus(elements, "Город выбран.");
+    setSearchStatus(elements, t(state.language, "search.selected"));
   });
-  setSearchStatus(elements, payload.results.length ? "Выберите подходящий вариант." : "Ничего не найдено.");
+  setSearchStatus(elements, payload.results.length ? t(state.language, "search.chooseResult") : t(state.language, "search.none"));
 }
 
 function debounceSearch(state: AppState, elements: AppElements, query: string): void {
@@ -367,26 +369,26 @@ function debounceSearch(state: AppState, elements: AppElements, query: string): 
 
 function detectLocation(state: AppState, elements: AppElements): void {
   if (!navigator.geolocation) {
-    setSearchStatus(elements, "Геолокация недоступна. Используйте ручной поиск.");
+    setSearchStatus(elements, t(state.language, "search.geoUnavailable"));
     return;
   }
 
-  setSearchStatus(elements, "Определяем местоположение...");
+  setSearchStatus(elements, t(state.language, "search.geolocating"));
   navigator.geolocation.getCurrentPosition(
     async ({ coords }) => {
       try {
         const payload = await reverseLocation(coords.latitude, coords.longitude);
         if (!payload.results.length) {
-          throw new Error("Не удалось определить город по координатам.");
+          throw new Error(t(state.language, "search.geoNotFound"));
         }
         await applyLocation(state, elements, payload.results[0]);
-        setSearchStatus(elements, "Местоположение определено.");
+        setSearchStatus(elements, t(state.language, "search.geoDetected"));
       } catch (error) {
         setSearchStatus(elements, error instanceof Error ? error.message : "Ошибка геолокации");
       }
     },
     () => {
-      setSearchStatus(elements, "Доступ к геолокации отклонён. Используйте поиск города.");
+      setSearchStatus(elements, t(state.language, "search.geoDenied"));
     },
     { enableHighAccuracy: true, timeout: 10000 }
   );
@@ -395,7 +397,7 @@ function detectLocation(state: AppState, elements: AppElements): void {
 function shiftMonth(state: AppState, elements: AppElements, offset: number): void {
   state.monthlyDate = new Date(state.monthlyDate.getFullYear(), state.monthlyDate.getMonth() + offset, 1);
   void loadPrayerData(state, elements).catch((error: unknown) => {
-    setStatus(elements, error instanceof Error ? error.message : "Ошибка загрузки месяца");
+    setStatus(elements, error instanceof Error ? error.message : t(state.language, "status.reloadingMonth"));
   });
 }
 
@@ -403,10 +405,10 @@ function toggleFavorite(state: AppState, elements: AppElements): void {
   const exists = state.favorites.some((item) => item.id === state.location.id);
   if (exists) {
     state.favorites = state.favorites.filter((item) => item.id !== state.location.id);
-    setSearchStatus(elements, "Город удалён из избранного.");
+    setSearchStatus(elements, t(state.language, "favorites.remove"));
   } else {
     state.favorites = [state.location, ...state.favorites.filter((item) => item.id !== state.location.id)].slice(0, 6);
-    setSearchStatus(elements, "Город добавлен в избранное.");
+    setSearchStatus(elements, t(state.language, "favorites.toggle"));
   }
   saveFavoriteLocations(state.favorites);
   renderFavoriteCities(state, elements, async (location) => applyLocation(state, elements, location));

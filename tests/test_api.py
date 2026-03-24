@@ -1,9 +1,11 @@
 import unittest
+from dataclasses import replace
 from datetime import date
 from unittest.mock import AsyncMock, patch
 
 import httpx
 
+from app.config import settings as base_settings
 from app.main import app
 from app.schemas import (
     LocationResult,
@@ -46,13 +48,21 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.json()["openapi_url"], "/openapi.json")
 
     async def test_metrics_endpoint(self):
-        response = await self.client.get("/metrics")
+        with patch("app.main.settings", replace(base_settings, metrics_enabled=True)):
+            response = await self.client.get("/metrics")
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertIn("cache", body)
         self.assertIn("rate_limit", body)
         self.assertIn("enabled", body["rate_limit"])
+
+    async def test_metrics_endpoint_returns_404_when_disabled(self):
+        with patch("app.main.settings", replace(base_settings, metrics_enabled=False)):
+            response = await self.client.get("/metrics")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["error"]["code"], "NOT_FOUND")
 
     async def test_root_serves_frontend(self):
         response = await self.client.get("/")

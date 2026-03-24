@@ -213,7 +213,14 @@ class PrayerTimesService:
 
     async def check_ready(self) -> bool:
         try:
-            await self._get_client()
+            request = build_prayer_request(
+                latitude=55.7558,
+                longitude=37.6173,
+                method=2,
+                school=0,
+                target_date=date.today(),
+            )
+            await self._fetch_timings(request)
         except RuntimeError:
             return False
         return True

@@ -20,6 +20,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  const url = new URL(event.request.url);
+  const isApiRequest = url.pathname.startsWith("/api/") || url.pathname.startsWith("/v1/") || url.pathname === "/metrics";
+
+  if (isApiRequest) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) {

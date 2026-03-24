@@ -37,6 +37,7 @@ class Settings:
     rate_limit_requests: int = _get_int("RATE_LIMIT_REQUESTS", 120)
     rate_limit_window_seconds: int = _get_int("RATE_LIMIT_WINDOW_SECONDS", 60)
     security_headers_enabled: bool = _get_bool("SECURITY_HEADERS_ENABLED", True)
+    metrics_enabled: bool = _get_bool("METRICS_ENABLED", False)
     cors_allow_origins: list[str] = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:

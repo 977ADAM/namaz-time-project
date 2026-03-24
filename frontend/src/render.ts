@@ -1,9 +1,13 @@
-import { PRAYER_LABELS, WEEKDAYS } from "./constants";
+import { PRAYER_LABELS } from "./constants";
 import type { AppElements } from "./dom";
 import { formatDateTime, formatMonthYear, formatTime } from "./formatters";
 import { getLocaleCode, t } from "./locales";
 import type { AppState } from "./state";
 import type { CityComparison, LocationResult, NotifiablePrayerKey, PrayerMoment, QuickPreset } from "./types";
+
+function formatWeekdayLabel(dayIsoDate: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { weekday: "long" }).format(new Date(`${dayIsoDate}T00:00:00Z`));
+}
 
 export function setStatus(elements: AppElements, message: string): void {
   elements.status.textContent = message;
@@ -34,7 +38,7 @@ export function renderTodayMeta(state: AppState, elements: AppElements): void {
 export function renderTodayTimings(state: AppState, elements: AppElements): void {
   elements.todayTimes.innerHTML = "";
   if (!state.today?.times) {
-    elements.todayTimes.innerHTML = `<div class="empty-state">Нет данных для отображения.</div>`;
+    elements.todayTimes.innerHTML = `<div class="empty-state">${t(state.language, "status.noData")}</div>`;
     return;
   }
 
@@ -74,7 +78,7 @@ export function renderMonthlyTable(state: AppState, elements: AppElements): void
   if (!state.monthly?.days?.length) {
     elements.monthlyBody.innerHTML = `
       <tr>
-        <td colspan="9" class="empty-cell">Нет данных для выбранного месяца.</td>
+        <td colspan="9" class="empty-cell">${t(state.language, "status.noMonthData")}</td>
       </tr>
     `;
     return;
@@ -85,7 +89,7 @@ export function renderMonthlyTable(state: AppState, elements: AppElements): void
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${day.date}</td>
-      <td>${WEEKDAYS[day.weekday as keyof typeof WEEKDAYS] || day.weekday}</td>
+      <td>${formatWeekdayLabel(day.date, getLocaleCode(state.language))}</td>
       <td>${day.hijri || "—"}</td>
       <td>${formatTime(day.times.fajr, state.timeFormat)}</td>
       <td>${formatTime(day.times.sunrise, state.timeFormat)}</td>
@@ -99,13 +103,14 @@ export function renderMonthlyTable(state: AppState, elements: AppElements): void
 }
 
 export function renderSearchResults(
+  state: AppState,
   results: LocationResult[],
   elements: AppElements,
   onSelect: (location: LocationResult) => void | Promise<void>
 ): void {
   elements.searchResults.innerHTML = "";
   if (!results.length) {
-    elements.searchResults.innerHTML = `<div class="empty-state compact">Ничего не найдено. Попробуйте другой запрос.</div>`;
+    elements.searchResults.innerHTML = `<div class="empty-state compact">${t(state.language, "search.none")}</div>`;
     return;
   }
 
@@ -132,7 +137,7 @@ export function renderFavoriteCities(
 ): void {
   elements.favoritesList.innerHTML = "";
   if (!state.favorites.length) {
-    elements.favoritesList.innerHTML = `<div class="empty-state compact">Добавьте город в избранное для быстрого переключения.</div>`;
+    elements.favoritesList.innerHTML = `<div class="empty-state compact">${t(state.language, "favorites.empty")}</div>`;
     return;
   }
 
@@ -153,7 +158,7 @@ export function renderFavoriteCities(
 
 export function renderFavoriteToggle(state: AppState, elements: AppElements): void {
   const isFavorite = state.favorites.some((item) => item.id === state.location.id);
-  elements.favoriteToggleButton.textContent = isFavorite ? "Убрать из избранного" : t(state.language, "favorites.toggle");
+  elements.favoriteToggleButton.textContent = isFavorite ? t(state.language, "favorites.remove") : t(state.language, "favorites.toggle");
 }
 
 export function renderQuickPresets(
@@ -174,8 +179,8 @@ export function renderQuickPresets(
     }
     button.innerHTML = `
       <span class="preset-label">${getPresetLabel(state, preset)}</span>
-      <strong class="preset-title">${preset.location?.city || "Сохранить текущий"}</strong>
-      <small class="preset-meta">${preset.location?.country || "Нажмите, чтобы привязать активный город"}</small>
+      <strong class="preset-title">${preset.location?.city || t(state.language, "preset.saveCurrent")}</strong>
+      <small class="preset-meta">${preset.location?.country || t(state.language, "preset.assignCurrent")}</small>
     `;
     button.addEventListener("click", () => {
       void onSelect(preset);
@@ -185,13 +190,14 @@ export function renderQuickPresets(
 }
 
 export function renderCityComparisons(
+  state: AppState,
   comparisons: CityComparison[],
   elements: AppElements,
   onSelect: (presetId: string) => void | Promise<void>
 ): void {
   elements.compareList.innerHTML = "";
   if (!comparisons.length) {
-    elements.compareList.innerHTML = `<div class="empty-state compact">Сохраните города в Дом, Работа или Путешествие, чтобы сравнивать их.</div>`;
+    elements.compareList.innerHTML = `<div class="empty-state compact">${t(state.language, "compare.empty")}</div>`;
     return;
   }
 
@@ -232,8 +238,8 @@ export function renderHeroState(
 ): void {
   elements.heroPrayerName.textContent = payload.next?.label || "Нет данных";
   elements.heroPrayerTime.textContent = payload.next
-    ? `${payload.next.date === state.today?.date?.gregorian ? "Сегодня" : "Завтра"} в ${formatTime(payload.next.time, state.timeFormat)}`
-    : "Выберите город";
+    ? `${payload.next.date === state.today?.date?.gregorian ? t(state.language, "countdown.today") : t(state.language, "countdown.tomorrow")} ${formatTime(payload.next.time, state.timeFormat)}`
+    : t(state.language, "status.chooseCity");
   elements.heroCountdown.textContent = payload.countdown;
   elements.heroStatus.textContent = payload.liveStatus;
   elements.heroProgressBar.style.width = `${payload.progressPercent}%`;
@@ -242,18 +248,19 @@ export function renderHeroState(
 export function renderNotifications(state: AppState, elements: AppElements): void {
   const permission = "Notification" in window ? Notification.permission : "unsupported";
   elements.notificationButton.textContent = state.notificationsEnabled
-    ? "Уведомления включены"
-    : "Включить уведомления";
+    ? t(state.language, "notification.enabled")
+    : t(state.language, "notification.enable");
   const permissionText =
     permission === "granted"
-      ? "Браузерные уведомления разрешены."
+      ? t(state.language, "notification.permission.granted")
       : permission === "denied"
-        ? "Браузер заблокировал уведомления."
+        ? t(state.language, "notification.permission.denied")
         : permission === "unsupported"
-          ? "Этот браузер не поддерживает уведомления."
-          : "Разрешение пока не выдано.";
+          ? t(state.language, "notification.permission.unsupported")
+          : t(state.language, "notification.permission.default");
   const selectedPrayers = state.notificationPrayerKeys.map((key) => PRAYER_LABELS[key]).join(", ");
-  const leadText = state.notificationLeadMinutes > 0 ? `за ${state.notificationLeadMinutes} мин.` : "в момент начала";
+  const leadText =
+    state.notificationLeadMinutes > 0 ? `${state.notificationLeadMinutes} min.` : t(state.language, "notification.lead.instant");
   elements.notificationStatus.textContent = `${permissionText} Сценарий: ${selectedPrayers}, ${leadText}.`;
   elements.notificationLeadMinutes.value = String(state.notificationLeadMinutes);
   elements.notificationCurrentCityOnly.checked = state.notificationCurrentCityOnly;
@@ -278,14 +285,14 @@ export function renderTrustLayer(state: AppState, elements: AppElements): void {
   elements.trustSource.textContent = "Aladhan API";
   elements.trustUpdated.textContent = updatedAt;
   elements.trustDisclaimer.textContent =
-    "Время рассчитано по выбранному методу и может отличаться от расписания местной мечети или духовного управления.";
+    t(state.language, "trust.disclaimer");
 }
 
 export function renderInstallState(state: AppState, elements: AppElements): void {
   elements.installAppButton.disabled = !state.pwaInstallAvailable;
   elements.installAppButton.textContent = t(state.language, "settings.installButton");
   elements.installAppStatus.textContent = state.pwaInstallAvailable
-    ? "Приложение готово к установке на устройство."
+    ? t(state.language, "settings.installHint")
     : t(state.language, "settings.installUnavailable");
 }
 

@@ -166,13 +166,14 @@ async def runtime_error_handler(_: Request, exc: RuntimeError) -> JSONResponse:
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse:
+    detail = str(exc.detail)
     if exc.status_code == 404:
-        code = "CITY_NOT_FOUND"
+        code = "CITY_NOT_FOUND" if "city not found" in detail.lower() else "NOT_FOUND"
     elif exc.status_code == 400:
         code = "INVALID_INPUT"
     else:
         code = "INTERNAL_ERROR"
-    return JSONResponse(status_code=exc.status_code, content=api_error(code, str(exc.detail)))
+    return JSONResponse(status_code=exc.status_code, content=api_error(code, detail))
 
 
 @app.exception_handler(Exception)
@@ -218,6 +219,8 @@ async def app_meta() -> AppMetaResponse:
 
 @app.get("/metrics", response_model=MetricsResponse)
 async def metrics() -> MetricsResponse:
+    if not settings.metrics_enabled:
+        raise HTTPException(status_code=404, detail="Metrics endpoint is disabled")
     return MetricsResponse(
         environment=settings.environment,
         version=settings.app_version,

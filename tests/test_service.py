@@ -150,3 +150,20 @@ class PrayerTimesServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.month, 3)
         self.assertEqual(result.timezone, "Europe/Moscow")
         self.assertEqual(result.days[0].timings.maghrib, "19:04")
+
+    async def test_check_ready_probes_upstream(self):
+        service = PrayerTimesService()
+
+        with patch.object(service, "_fetch_timings", AsyncMock(return_value={"code": 200, "data": {}})) as mocked_fetch:
+            result = await service.check_ready()
+
+        self.assertTrue(result)
+        self.assertEqual(mocked_fetch.await_count, 1)
+
+    async def test_check_ready_returns_false_when_upstream_fails(self):
+        service = PrayerTimesService()
+
+        with patch.object(service, "_fetch_timings", AsyncMock(side_effect=RuntimeError("boom"))):
+            result = await service.check_ready()
+
+        self.assertFalse(result)
