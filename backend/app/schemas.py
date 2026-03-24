@@ -1,38 +1,51 @@
-from pydantic import BaseModel, Field
+from datetime import date
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PrayerTimings(BaseModel):
-    fajr: str = Field(..., description="Время Fajr")
-    sunrise: str = Field(..., description="Время Sunrise")
-    dhuhr: str = Field(..., description="Время Dhuhr")
-    asr: str = Field(..., description="Время Asr")
-    maghrib: str = Field(..., description="Время Maghrib")
-    isha: str = Field(..., description="Время Isha")
+    fajr: str = Field(..., description="Fajr")
+    sunrise: str = Field(..., description="Sunrise")
+    dhuhr: str = Field(..., description="Dhuhr")
+    asr: str = Field(..., description="Asr")
+    maghrib: str = Field(..., description="Maghrib")
+    isha: str = Field(..., description="Isha")
 
 
 class PrayerDateInfo(BaseModel):
-    readable: str
-    timestamp: str
-    gregorian: dict
-    hijri: dict
+    readable: str = Field(..., description="Readable date from upstream API")
+    timestamp: str = Field(..., description="Unix timestamp returned by upstream API")
+    gregorian: dict = Field(default_factory=dict)
+    hijri: dict = Field(default_factory=dict)
 
 
 class PrayerMeta(BaseModel):
-    latitude: float
-    longitude: float
-    timezone: str
-    method: dict
-    latitude_adjustment_method: str | None = None
-    midnight_mode: str | None = None
-    school: str | None = None
-    offset: dict | None = None
+    model_config = ConfigDict(populate_by_name=True)
+
+    latitude: float = Field(..., description="Latitude used for calculation")
+    longitude: float = Field(..., description="Longitude used for calculation")
+    timezone: str = Field(..., description="Resolved timezone")
+    method: dict = Field(default_factory=dict, description="Calculation method details")
+    latitude_adjustment_method: str | None = Field(default=None, alias="latitudeAdjustmentMethod")
+    midnight_mode: str | None = Field(default=None, alias="midnightMode")
+    school: str | None = Field(default=None, description="Asr juristic school")
+    offset: dict | None = Field(default=None, description="Prayer-specific offsets")
+
+
+class PrayerRequest(BaseModel):
+    latitude: float = Field(..., ge=-90, le=90)
+    longitude: float = Field(..., ge=-180, le=180)
+    method: int = Field(default=2, description="Aladhan calculation method")
+    school: int = Field(default=0, description="0 = Standard, 1 = Hanafi")
+    target_date: date = Field(..., alias="date")
 
 
 class PrayerTimesResponse(BaseModel):
+    requested_date: date = Field(..., description="Date requested by client")
     timings: PrayerTimings
     date: PrayerDateInfo
     meta: PrayerMeta
 
 
 class ErrorResponse(BaseModel):
-    detail: str
+    detail: str = Field(..., description="Human-readable error message")
