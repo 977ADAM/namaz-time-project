@@ -28,11 +28,32 @@ export interface PrayerDateInfo {
   hijri: Record<string, string>;
 }
 
+export interface ApiDateInfo {
+  gregorian: string;
+  hijri: string;
+}
+
 export interface PrayerMeta {
   latitude: number;
   longitude: number;
   timezone: string;
   method: Record<string, unknown> & { name?: string };
+}
+
+export interface ApiLocation {
+  id?: string | null;
+  city: string;
+  country: string;
+  region?: string | null;
+  lat: number;
+  lng: number;
+  timezone: string;
+}
+
+export interface ApiMethod {
+  id: string;
+  name: string;
+  provider_id: number;
 }
 
 export interface PrayerTimings {
@@ -44,7 +65,23 @@ export interface PrayerTimings {
   isha: string;
 }
 
+export interface PrayerNameValue {
+  key: PrayerKey;
+  label: string;
+  time: string;
+}
+
 export interface PrayerTimesResponse {
+  location: ApiLocation;
+  date: ApiDateInfo;
+  method: ApiMethod;
+  times: PrayerTimings;
+  current_prayer?: PrayerNameValue | null;
+  next_prayer?: PrayerNameValue | null;
+  next_prayer_date?: string | null;
+}
+
+export interface LegacyPrayerTimesResponse {
   requested_date: string;
   timings: PrayerTimings;
   date: PrayerDateInfo;
@@ -52,18 +89,17 @@ export interface PrayerTimesResponse {
 }
 
 export interface PrayerCalendarDay {
-  requested_date: string;
-  readable_date: string;
-  hijri_date: string;
+  date: string;
   weekday: string;
-  timings: PrayerTimings;
+  hijri: string;
+  times: PrayerTimings;
 }
 
 export interface PrayerCalendarResponse {
+  location: ApiLocation;
   year: number;
   month: number;
-  timezone: string;
-  method: Record<string, unknown>;
+  method: ApiMethod;
   days: PrayerCalendarDay[];
 }
 

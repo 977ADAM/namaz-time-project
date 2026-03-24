@@ -10,21 +10,21 @@ export function getPrayerMoments(
   todayPayload: PrayerTimesResponse | null,
   tomorrowPayload: PrayerTimesResponse | null
 ): PrayerMoment[] {
-  if (!todayPayload?.timings || !todayPayload.meta?.timezone) {
+  if (!todayPayload?.times || !todayPayload.location?.timezone) {
     return [];
   }
 
-  const timezone = todayPayload.meta.timezone;
+  const timezone = todayPayload.location.timezone;
   const moments: Array<[PrayerMoment["key"], string, string]> = [
-    ["fajr", todayPayload.requested_date, todayPayload.timings.fajr],
-    ["dhuhr", todayPayload.requested_date, todayPayload.timings.dhuhr],
-    ["asr", todayPayload.requested_date, todayPayload.timings.asr],
-    ["maghrib", todayPayload.requested_date, todayPayload.timings.maghrib],
-    ["isha", todayPayload.requested_date, todayPayload.timings.isha],
+    ["fajr", todayPayload.date.gregorian, todayPayload.times.fajr],
+    ["dhuhr", todayPayload.date.gregorian, todayPayload.times.dhuhr],
+    ["asr", todayPayload.date.gregorian, todayPayload.times.asr],
+    ["maghrib", todayPayload.date.gregorian, todayPayload.times.maghrib],
+    ["isha", todayPayload.date.gregorian, todayPayload.times.isha],
   ];
 
-  if (tomorrowPayload?.timings?.fajr) {
-    moments.push(["fajr", tomorrowPayload.requested_date, tomorrowPayload.timings.fajr]);
+  if (tomorrowPayload?.times?.fajr) {
+    moments.push(["fajr", tomorrowPayload.date.gregorian, tomorrowPayload.times.fajr]);
   }
 
   const pendingMoments: PendingPrayerMoment[] = moments

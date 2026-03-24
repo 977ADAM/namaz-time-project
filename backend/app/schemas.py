@@ -56,6 +56,37 @@ class PrayerTimesResponse(BaseModel):
     next_prayer_date: date | None = None
 
 
+class ApiLocation(BaseModel):
+    id: str | None = None
+    city: str
+    country: str
+    region: str | None = None
+    lat: float
+    lng: float
+    timezone: str
+
+
+class ApiDateValue(BaseModel):
+    gregorian: str
+    hijri: str
+
+
+class ApiMethod(BaseModel):
+    id: str
+    name: str
+    provider_id: int
+
+
+class ApiPrayerTimesPayload(BaseModel):
+    location: ApiLocation
+    date: ApiDateValue
+    method: ApiMethod
+    times: PrayerTimings
+    current_prayer: PrayerNameValue | None = None
+    next_prayer: PrayerNameValue | None = None
+    next_prayer_date: date | None = None
+
+
 class PrayerCalendarDay(BaseModel):
     requested_date: date
     readable_date: str
@@ -70,6 +101,21 @@ class PrayerCalendarResponse(BaseModel):
     timezone: str
     method: dict = Field(default_factory=dict)
     days: list[PrayerCalendarDay]
+
+
+class ApiPrayerCalendarDay(BaseModel):
+    date: str
+    weekday: str
+    hijri: str
+    times: PrayerTimings
+
+
+class ApiPrayerCalendarPayload(BaseModel):
+    location: ApiLocation
+    year: int
+    month: int
+    method: ApiMethod
+    days: list[ApiPrayerCalendarDay]
 
 
 class LocationResult(BaseModel):

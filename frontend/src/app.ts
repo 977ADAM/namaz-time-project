@@ -2,7 +2,7 @@ import { reverseLocation, loadMethods, loadPrayerBundle, searchCities } from "./
 import { STORAGE_KEYS } from "./constants";
 import type { AppElements } from "./dom";
 import { getElements } from "./dom";
-import { formatTime } from "./formatters";
+import { formatTime, getIsoDateInTimezone, shiftIsoDate } from "./formatters";
 import { getPrayerState } from "./prayer";
 import {
   renderFavoriteCities,
@@ -103,7 +103,7 @@ function updateCountdown(state: AppState, elements: AppElements): void {
   }
 
   elements.nextPrayerName.textContent = next.label;
-  elements.nextPrayerTime.textContent = `${next.date === state.today.requested_date ? "Сегодня" : "Завтра"} в ${formatTime(next.time, state.timeFormat)}`;
+  elements.nextPrayerTime.textContent = `${next.date === state.today.date.gregorian ? "Сегодня" : "Завтра"} в ${formatTime(next.time, state.timeFormat)}`;
 
   const diffMs = next.datetime.getTime() - Date.now();
   if (diffMs <= 0) {
@@ -146,11 +146,9 @@ function startCountdown(state: AppState, elements: AppElements): void {
 }
 
 async function loadPrayerData(state: AppState, elements: AppElements): Promise<void> {
-  const currentDate = new Date();
-  const todayValue = currentDate.toISOString().slice(0, 10);
-  const tomorrowDate = new Date(currentDate);
-  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-  const tomorrowValue = tomorrowDate.toISOString().slice(0, 10);
+  const activeTimezone = state.location.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const todayValue = getIsoDateInTimezone(activeTimezone);
+  const tomorrowValue = shiftIsoDate(todayValue, 1);
 
   setStatus(elements, "Загружаем времена намаза...");
   const [todayPayload, tomorrowPayload, monthlyPayload] = await loadPrayerBundle({
@@ -167,7 +165,7 @@ async function loadPrayerData(state: AppState, elements: AppElements): Promise<v
   state.today = todayPayload;
   state.tomorrow = tomorrowPayload;
   state.monthly = monthlyPayload;
-  state.location.timezone = todayPayload.meta?.timezone || state.location.timezone;
+  state.location.timezone = todayPayload.location?.timezone || state.location.timezone;
   saveLocation(state.location);
 
   renderAll(state, elements);

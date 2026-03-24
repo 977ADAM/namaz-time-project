@@ -13,6 +13,8 @@ from app.config import settings
 from app.schemas import (
     ApiErrorBody,
     ApiErrorResponse,
+    ApiPrayerCalendarPayload,
+    ApiPrayerTimesPayload,
     AppMetaResponse,
     CalculationMethod,
     ErrorResponse,
@@ -62,6 +64,17 @@ def api_error(code: str, message: str, details: dict | None = None) -> dict:
     return ApiErrorResponse(error=ApiErrorBody(code=code, message=message, details=details)).model_dump()
 
 
+def map_runtime_error(exc: RuntimeError) -> tuple[int, str]:
+    message = str(exc).lower()
+    if "timed out" in message or "timeout" in message:
+        return 504, "UPSTREAM_TIMEOUT"
+    if "429" in message or "rate" in message:
+        return 429, "RATE_LIMITED"
+    if "unavailable" in message:
+        return 502, "UPSTREAM_TIMEOUT"
+    return 502, "UPSTREAM_BAD_RESPONSE"
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allow_origins,
@@ -88,12 +101,18 @@ async def add_request_timing(request: Request, call_next):
 
 @app.exception_handler(RuntimeError)
 async def runtime_error_handler(_: Request, exc: RuntimeError) -> JSONResponse:
-    return JSONResponse(status_code=502, content=api_error("UPSTREAM_BAD_RESPONSE", str(exc)))
+    status_code, code = map_runtime_error(exc)
+    return JSONResponse(status_code=status_code, content=api_error(code, str(exc)))
 
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse:
-    code = "INVALID_INPUT" if exc.status_code == 400 else "INTERNAL_ERROR"
+    if exc.status_code == 404:
+        code = "CITY_NOT_FOUND"
+    elif exc.status_code == 400:
+        code = "INVALID_INPUT"
+    else:
+        code = "INTERNAL_ERROR"
     return JSONResponse(status_code=exc.status_code, content=api_error(code, str(exc.detail)))
 
 
@@ -174,17 +193,40 @@ async def get_prayer_times(
 
 @app.get(
     "/api/v1/prayer-times/today",
-    response_model=PrayerTimesResponse,
-    responses={400: {"model": ApiErrorResponse}, 502: {"model": ApiErrorResponse}},
+    response_model=ApiPrayerTimesPayload,
+    responses={400: {"model": ApiErrorResponse}, 404: {"model": ApiErrorResponse}, 502: {"model": ApiErrorResponse}},
 )
 async def get_prayer_times_today(
-    lat: float = Query(..., ge=-90, le=90),
-    lng: float = Query(..., ge=-180, le=180),
+    lat: float | None = Query(default=None, ge=-90, le=90),
+    lng: float | None = Query(default=None, ge=-180, le=180),
+    city: str | None = Query(default=None, min_length=2),
+    country: str | None = Query(default=None),
+    timezone: str | None = Query(default=None),
     method: int = Query(2),
     date_value: date = Query(default_factory=date.today, alias="date"),
     school: int = Query(0),
-) -> PrayerTimesResponse:
-    return await get_prayer_times(latitude=lat, longitude=lng, method=method, school=school, date_value=date_value)
+) -> ApiPrayerTimesPayload:
+    try:
+        location = await service.resolve_location(
+            latitude=lat,
+            longitude=lng,
+            city=city,
+            country=country,
+            timezone=timezone,
+        )
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if detail.startswith("City not found") else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+
+    legacy_response = await get_prayer_times(
+        latitude=location.latitude,
+        longitude=location.longitude,
+        method=method,
+        school=school,
+        date_value=date_value,
+    )
+    return service.to_api_prayer_times_payload(legacy_response, location, method_id=method)
 
 
 @app.get(
@@ -215,25 +257,42 @@ async def get_prayer_calendar(
 
 @app.get(
     "/api/v1/prayer-times/monthly",
-    response_model=PrayerCalendarResponse,
-    responses={400: {"model": ApiErrorResponse}, 502: {"model": ApiErrorResponse}},
+    response_model=ApiPrayerCalendarPayload,
+    responses={400: {"model": ApiErrorResponse}, 404: {"model": ApiErrorResponse}, 502: {"model": ApiErrorResponse}},
 )
 async def get_prayer_times_monthly(
-    lat: float = Query(..., ge=-90, le=90),
-    lng: float = Query(..., ge=-180, le=180),
+    lat: float | None = Query(default=None, ge=-90, le=90),
+    lng: float | None = Query(default=None, ge=-180, le=180),
+    city: str | None = Query(default=None, min_length=2),
+    country: str | None = Query(default=None),
+    timezone: str | None = Query(default=None),
     method: int = Query(2),
     year: int = Query(..., ge=2000, le=2100),
     month: int = Query(..., ge=1, le=12),
     school: int = Query(0),
-) -> PrayerCalendarResponse:
-    return await get_prayer_calendar(
-        latitude=lat,
-        longitude=lng,
+) -> ApiPrayerCalendarPayload:
+    try:
+        location = await service.resolve_location(
+            latitude=lat,
+            longitude=lng,
+            city=city,
+            country=country,
+            timezone=timezone,
+        )
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if detail.startswith("City not found") else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+
+    legacy_response = await get_prayer_calendar(
+        latitude=location.latitude,
+        longitude=location.longitude,
         method=method,
         school=school,
         year=year,
         month=month,
     )
+    return service.to_api_prayer_calendar_payload(legacy_response, location, method_id=method)
 
 
 @app.get(

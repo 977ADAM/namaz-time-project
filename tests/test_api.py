@@ -101,6 +101,60 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body["timings"]["isha"], "20:42")
         self.assertEqual(body["next_prayer"]["key"], "isha")
 
+    async def test_api_prayer_times_today_endpoint_returns_normalized_payload(self):
+        location = LocationResult(
+            id="geo_1",
+            city="Moscow",
+            country="Russia",
+            region="Moscow",
+            display_name="Moscow, Russia",
+            latitude=55.7558,
+            longitude=37.6173,
+            timezone="Europe/Moscow",
+        )
+        legacy_payload = PrayerTimesResponse(
+            requested_date=date(2026, 3, 24),
+            timings=PrayerTimings(
+                fajr="04:12",
+                sunrise="05:55",
+                dhuhr="12:31",
+                asr="16:05",
+                maghrib="19:04",
+                isha="20:42",
+            ),
+            date=PrayerDateInfo(
+                readable="24 Mar 2026",
+                timestamp="1774306800",
+                gregorian={"date": "24-03-2026"},
+                hijri={"date": "05-10-1447"},
+            ),
+            meta=PrayerMeta(
+                latitude=55.7558,
+                longitude=37.6173,
+                timezone="Europe/Moscow",
+                method={"id": 2, "name": "ISNA"},
+            ),
+            current_prayer=PrayerNameValue(key="maghrib", label="Магриб", time="19:04"),
+            next_prayer=PrayerNameValue(key="isha", label="Иша", time="20:42"),
+            next_prayer_date=date(2026, 3, 24),
+        )
+
+        with (
+            patch("app.main.service.resolve_location", AsyncMock(return_value=location)),
+            patch("app.main.service.get_prayer_times", AsyncMock(return_value=legacy_payload)),
+        ):
+            response = await self.client.get(
+                "/api/v1/prayer-times/today",
+                params={"city": "Moscow", "country": "Russia", "date": "2026-03-24", "method": 2},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["location"]["city"], "Moscow")
+        self.assertEqual(body["date"]["gregorian"], "2026-03-24")
+        self.assertEqual(body["method"]["id"], "ISNA")
+        self.assertEqual(body["times"]["isha"], "20:42")
+
     async def test_prayer_calendar_endpoint(self):
         mocked_response = PrayerCalendarResponse(
             year=2026,
@@ -142,6 +196,55 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         body = response.json()
         self.assertEqual(body["month"], 3)
         self.assertEqual(body["days"][0]["timings"]["fajr"], "04:12")
+
+    async def test_api_prayer_times_monthly_endpoint_returns_normalized_payload(self):
+        location = LocationResult(
+            id="geo_1",
+            city="Moscow",
+            country="Russia",
+            region="Moscow",
+            display_name="Moscow, Russia",
+            latitude=55.7558,
+            longitude=37.6173,
+            timezone="Europe/Moscow",
+        )
+        legacy_payload = PrayerCalendarResponse(
+            year=2026,
+            month=3,
+            timezone="Europe/Moscow",
+            method={"id": 2, "name": "ISNA"},
+            days=[
+                PrayerCalendarDay(
+                    requested_date=date(2026, 3, 24),
+                    readable_date="24 Mar 2026",
+                    hijri_date="05-10-1447",
+                    weekday="Tuesday",
+                    timings=PrayerTimings(
+                        fajr="04:12",
+                        sunrise="05:55",
+                        dhuhr="12:31",
+                        asr="16:05",
+                        maghrib="19:04",
+                        isha="20:42",
+                    ),
+                )
+            ],
+        )
+
+        with (
+            patch("app.main.service.resolve_location", AsyncMock(return_value=location)),
+            patch("app.main.service.get_prayer_calendar", AsyncMock(return_value=legacy_payload)),
+        ):
+            response = await self.client.get(
+                "/api/v1/prayer-times/monthly",
+                params={"lat": 55.7558, "lng": 37.6173, "year": 2026, "month": 3, "method": 2},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["location"]["timezone"], "Europe/Moscow")
+        self.assertEqual(body["method"]["name"], "Islamic Society of North America")
+        self.assertEqual(body["days"][0]["times"]["fajr"], "04:12")
 
     async def test_location_search_endpoint(self):
         mocked_locations = [

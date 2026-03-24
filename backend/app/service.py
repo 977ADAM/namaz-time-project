@@ -7,6 +7,12 @@ import httpx
 
 from app.config import settings
 from app.schemas import (
+    ApiDateValue,
+    ApiLocation,
+    ApiMethod,
+    ApiPrayerCalendarDay,
+    ApiPrayerCalendarPayload,
+    ApiPrayerTimesPayload,
     LocationResult,
     PrayerCalendarDay,
     PrayerCalendarResponse,
@@ -50,6 +56,7 @@ class PrayerTimesService:
         self._cache: dict[tuple[float, float, int, int, str], tuple[float, PrayerTimesResponse]] = {}
         self._calendar_cache: dict[tuple[float, float, int, int, int, int], tuple[float, PrayerCalendarResponse]] = {}
         self._timezone_cache: dict[tuple[float, float], tuple[float, str]] = {}
+        self._location_cache: dict[tuple[float, float], tuple[float, LocationResult]] = {}
 
     async def get_prayer_times(self, request: PrayerRequest) -> PrayerTimesResponse:
         self._validate_method(request.method)
@@ -119,6 +126,14 @@ class PrayerTimesService:
         return results
 
     async def reverse_geocode(self, *, latitude: float, longitude: float) -> LocationResult:
+        cache_key = (round(latitude, 3), round(longitude, 3))
+        cached = self._location_cache.get(cache_key)
+        if cached is not None:
+            expires_at, result = cached
+            if expires_at > monotonic():
+                return result.model_copy(deep=True)
+            self._location_cache.pop(cache_key, None)
+
         client = await self._get_client()
         try:
             response = await client.get(
@@ -140,10 +155,45 @@ class PrayerTimesService:
 
         result = self._map_location_result(response.json())
         result.timezone = await self._resolve_timezone(result.latitude, result.longitude)
+        if self.cache_ttl_seconds > 0:
+            self._location_cache[cache_key] = (monotonic() + self.cache_ttl_seconds, result.model_copy(deep=True))
+        return result
+
+    async def resolve_location(
+        self,
+        *,
+        latitude: float | None,
+        longitude: float | None,
+        city: str | None = None,
+        country: str | None = None,
+        timezone: str | None = None,
+    ) -> LocationResult:
+        if latitude is not None and longitude is not None:
+            result = await self.reverse_geocode(latitude=latitude, longitude=longitude)
+            if timezone:
+                result.timezone = timezone
+            return result
+
+        if not city:
+            raise ValueError("Either lat/lng or city must be provided")
+
+        query = ", ".join(part for part in [city.strip(), (country or "").strip()] if part)
+        results = await self.search_locations(query, limit=1)
+        if not results:
+            raise ValueError(f"City not found: {city}")
+        result = results[0]
+        if timezone:
+            result.timezone = timezone
         return result
 
     def get_methods(self) -> list[dict[str, str | int]]:
         return self.CALCULATION_METHODS
+
+    def get_method(self, provider_id: int) -> dict[str, str | int]:
+        for method in self.CALCULATION_METHODS:
+            if method["id"] == provider_id:
+                return method
+        raise ValueError(f"Invalid method={provider_id}. Allowed values: {sorted(self.ALLOWED_METHODS)}")
 
     async def check_ready(self) -> bool:
         try:
@@ -467,6 +517,75 @@ class PrayerTimesService:
         if not value:
             return ""
         return value.split(" ")[0].strip()
+
+    def to_api_prayer_times_payload(
+        self,
+        response: PrayerTimesResponse,
+        location: LocationResult,
+        *,
+        method_id: int,
+    ) -> ApiPrayerTimesPayload:
+        method = self.get_method(method_id)
+        return ApiPrayerTimesPayload(
+            location=ApiLocation(
+                id=location.id,
+                city=location.city,
+                country=location.country,
+                region=location.region,
+                lat=location.latitude,
+                lng=location.longitude,
+                timezone=location.timezone or response.meta.timezone,
+            ),
+            date=ApiDateValue(
+                gregorian=response.requested_date.isoformat(),
+                hijri=(response.date.hijri or {}).get("date", ""),
+            ),
+            method=ApiMethod(
+                id=str(method["code"]),
+                name=str(method["name"]),
+                provider_id=int(method["id"]),
+            ),
+            times=response.timings,
+            current_prayer=response.current_prayer,
+            next_prayer=response.next_prayer,
+            next_prayer_date=response.next_prayer_date,
+        )
+
+    def to_api_prayer_calendar_payload(
+        self,
+        response: PrayerCalendarResponse,
+        location: LocationResult,
+        *,
+        method_id: int,
+    ) -> ApiPrayerCalendarPayload:
+        method = self.get_method(method_id)
+        return ApiPrayerCalendarPayload(
+            location=ApiLocation(
+                id=location.id,
+                city=location.city,
+                country=location.country,
+                region=location.region,
+                lat=location.latitude,
+                lng=location.longitude,
+                timezone=location.timezone or response.timezone,
+            ),
+            year=response.year,
+            month=response.month,
+            method=ApiMethod(
+                id=str(method["code"]),
+                name=str(method["name"]),
+                provider_id=int(method["id"]),
+            ),
+            days=[
+                ApiPrayerCalendarDay(
+                    date=day.requested_date.isoformat(),
+                    weekday=day.weekday,
+                    hijri=day.hijri_date,
+                    times=day.timings,
+                )
+                for day in response.days
+            ],
+        )
 
     @classmethod
     def _validate_method(cls, method: int) -> None:

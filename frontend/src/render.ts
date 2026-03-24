@@ -14,25 +14,25 @@ export function setSearchStatus(elements: AppElements, message: string): void {
 
 export function renderLocation(state: AppState, elements: AppElements): void {
   elements.locationName.textContent = state.location.display_name;
-  const timezone = state.location.timezone || state.today?.meta?.timezone || "timezone не определён";
+  const timezone = state.location.timezone || state.today?.location?.timezone || "timezone не определён";
   elements.locationMeta.textContent = `${state.location.latitude.toFixed(4)}, ${state.location.longitude.toFixed(4)} • ${timezone}`;
 }
 
 export function renderDates(state: AppState, elements: AppElements): void {
-  elements.gregorianDate.textContent = state.today?.date?.readable || "--";
-  elements.hijriDate.textContent = state.today?.date?.hijri?.date || "--";
+  elements.gregorianDate.textContent = state.today?.date?.gregorian || "--";
+  elements.hijriDate.textContent = state.today?.date?.hijri || "--";
 }
 
 export function renderTodayMeta(state: AppState, elements: AppElements): void {
-  const methodName = state.today?.meta?.method?.name || "Метод не выбран";
-  const timezone = state.today?.meta?.timezone || "Без timezone";
+  const methodName = state.today?.method?.name || "Метод не выбран";
+  const timezone = state.today?.location?.timezone || "Без timezone";
   elements.todayTitle.textContent = state.location.display_name;
   elements.todayMeta.textContent = `${methodName} • ${timezone}`;
 }
 
 export function renderTodayTimings(state: AppState, elements: AppElements): void {
   elements.todayTimes.innerHTML = "";
-  if (!state.today?.timings) {
+  if (!state.today?.times) {
     elements.todayTimes.innerHTML = `<div class="empty-state">Нет данных для отображения.</div>`;
     return;
   }
@@ -40,7 +40,7 @@ export function renderTodayTimings(state: AppState, elements: AppElements): void
   const currentKey = state.liveCurrentPrayer?.key;
   const nextKey = state.liveNextPrayer?.key;
 
-  Object.entries(state.today.timings).forEach(([key, rawTime]) => {
+  Object.entries(state.today.times).forEach(([key, rawTime]) => {
     const card = document.createElement("article");
     card.className = "timing-card";
     if (key === currentKey) {
@@ -79,15 +79,15 @@ export function renderMonthlyTable(state: AppState, elements: AppElements): void
   state.monthly.days.forEach((day) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${day.readable_date}</td>
+      <td>${day.date}</td>
       <td>${WEEKDAYS[day.weekday as keyof typeof WEEKDAYS] || day.weekday}</td>
-      <td>${day.hijri_date || "—"}</td>
-      <td>${formatTime(day.timings.fajr, state.timeFormat)}</td>
-      <td>${formatTime(day.timings.sunrise, state.timeFormat)}</td>
-      <td>${formatTime(day.timings.dhuhr, state.timeFormat)}</td>
-      <td>${formatTime(day.timings.asr, state.timeFormat)}</td>
-      <td>${formatTime(day.timings.maghrib, state.timeFormat)}</td>
-      <td>${formatTime(day.timings.isha, state.timeFormat)}</td>
+      <td>${day.hijri || "—"}</td>
+      <td>${formatTime(day.times.fajr, state.timeFormat)}</td>
+      <td>${formatTime(day.times.sunrise, state.timeFormat)}</td>
+      <td>${formatTime(day.times.dhuhr, state.timeFormat)}</td>
+      <td>${formatTime(day.times.asr, state.timeFormat)}</td>
+      <td>${formatTime(day.times.maghrib, state.timeFormat)}</td>
+      <td>${formatTime(day.times.isha, state.timeFormat)}</td>
     `;
     elements.monthlyBody.appendChild(row);
   });
@@ -164,7 +164,7 @@ export function renderHeroState(
 ): void {
   elements.heroPrayerName.textContent = payload.next?.label || "Нет данных";
   elements.heroPrayerTime.textContent = payload.next
-    ? `${payload.next.date === state.today?.requested_date ? "Сегодня" : "Завтра"} в ${formatTime(payload.next.time, state.timeFormat)}`
+    ? `${payload.next.date === state.today?.date?.gregorian ? "Сегодня" : "Завтра"} в ${formatTime(payload.next.time, state.timeFormat)}`
     : "Выберите город";
   elements.heroCountdown.textContent = payload.countdown;
   elements.heroStatus.textContent = payload.liveStatus;
