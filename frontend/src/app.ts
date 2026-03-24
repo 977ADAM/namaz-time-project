@@ -637,7 +637,7 @@ function bindEvents(state: AppState, elements: AppElements): void {
 
   elements.locateButton.addEventListener("click", () => detectLocation(state, elements));
   elements.mobileChangeCityButton.addEventListener("click", () => {
-    document.querySelector(".search-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.querySelector(".topbar-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
   elements.favoriteToggleButton.addEventListener("click", () => toggleFavorite(state, elements));
   elements.retryButton.addEventListener("click", () => {

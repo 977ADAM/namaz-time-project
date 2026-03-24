@@ -90,6 +90,7 @@ body {
   color: var(--ink);
   font-family: "Manrope", sans-serif;
   font-size: 15px;
+  -webkit-tap-highlight-color: transparent;
   transition: background 900ms ease, color 400ms ease;
 }
 
@@ -159,6 +160,7 @@ select {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .brand strong,
@@ -238,6 +240,7 @@ h2 {
   color: var(--muted);
   line-height: 1.5;
   font-size: 0.95rem;
+  overflow-wrap: anywhere;
 }
 
 .city-form label,
@@ -358,6 +361,7 @@ h2 {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 6px;
+  min-width: 0;
 }
 
 .mobile-change-city-button {
@@ -374,6 +378,7 @@ h2 {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 6px;
+  min-width: 0;
 }
 
 .compact-button {
@@ -660,6 +665,7 @@ button:hover {
   white-space: nowrap;
   font-size: 0.92rem;
   backdrop-filter: blur(10px);
+  max-width: 100%;
 }
 
 .hero-countdown {
@@ -682,6 +688,7 @@ button:hover {
   margin: 0;
   font-size: 1rem;
   line-height: 1.6;
+  text-wrap: pretty;
 }
 
 .hero-progress-track {
@@ -937,6 +944,23 @@ button:hover {
   font-weight: 800;
 }
 
+#location-name,
+#today-title,
+#next-prayer-name,
+#current-prayer-name,
+#hero-prayer-name {
+  overflow-wrap: anywhere;
+}
+
+#location-meta,
+#today-meta,
+#trust-method,
+#trust-timezone,
+#trust-updated,
+#trust-source {
+  overflow-wrap: anywhere;
+}
+
 @keyframes heroFloat {
   0%,
   100% {
@@ -1029,18 +1053,141 @@ button:hover {
 
   .site-header {
     display: grid;
+    gap: 14px;
+    padding: 12px 14px;
+  }
+
+  .main-nav {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .main-nav a {
+    text-align: center;
+  }
+
+  .topbar-row {
+    align-items: stretch;
+  }
+
+  .toolbar-inline {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .shell {
+    padding: 10px 10px 22px;
+  }
+
+  .background-orb {
+    width: 24rem;
+    height: 24rem;
+    filter: blur(68px);
+  }
+
+  .site-header,
+  .panel {
+    border-radius: 20px;
+  }
+
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: color-mix(in srgb, var(--panel) 92%, white 8%);
+    backdrop-filter: blur(18px);
+  }
+
+  .main-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .topbar-panel {
+    margin-top: 10px;
+  }
+
+  .toolbar-inline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .compact-button {
+    width: 100%;
+  }
+
+  .favorites-list,
+  .quick-presets-list {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .favorite-chip,
+  .preset-card {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+
+  .hero-prayer-card {
+    padding: 16px;
+    border-radius: 24px;
+  }
+
+  .hero-prayer-name {
+    font-size: clamp(1.9rem, 11vw, 3.5rem);
+    max-width: none;
+  }
+
+  .hero-countdown {
+    font-size: clamp(2rem, 12vw, 4rem);
+    letter-spacing: 0.02em;
+  }
+
+  .timings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .compare-list {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-table {
+    min-width: 760px;
+  }
+
+  .table-wrap {
+    margin-inline: -4px;
+    padding-inline: 4px;
   }
 }
 
 @media (max-width: 640px) {
   .shell {
-    padding-inline: 8px;
+    padding: 8px 8px 18px;
   }
 
   .site-header,
   .panel {
     padding: 12px;
     border-radius: 16px;
+  }
+
+  .brand {
+    align-items: flex-start;
+  }
+
+  .brand span:last-child {
+    min-width: 0;
+  }
+
+  .brand strong {
+    font-size: 0.98rem;
+  }
+
+  .brand small {
+    font-size: 0.8rem;
   }
 
   .search-row {
@@ -1056,12 +1203,27 @@ button:hover {
     grid-template-columns: 1fr;
   }
 
+  input,
+  select,
+  button {
+    min-height: 44px;
+  }
+
+  .panel-head {
+    align-items: stretch;
+  }
+
+  .panel-head .panel-meta {
+    margin-top: 4px;
+  }
+
   .mobile-change-city-button {
     display: block;
   }
 
   .hero-prayer-top {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .hero-prayer-card {
@@ -1075,6 +1237,12 @@ button:hover {
 
   .hero-prayer-time {
     width: fit-content;
+    max-width: 100%;
+  }
+
+  .hero-status {
+    font-size: 0.94rem;
+    line-height: 1.5;
   }
 
   .summary-grid,
@@ -1082,8 +1250,110 @@ button:hover {
     gap: 6px;
   }
 
+  .metric-card,
+  .date-card,
+  .timing-card,
+  .trust-card {
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .trust-grid {
+    grid-template-columns: 1fr;
+  }
+
   .compare-inline {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 420px) {
+  .shell {
+    padding: 6px 6px 14px;
+  }
+
+  .site-header,
+  .panel {
+    padding: 10px;
+    border-radius: 14px;
+  }
+
+  .brand {
+    gap: 8px;
+  }
+
+  .brand-mark {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+  }
+
+  .main-nav a {
+    padding: 8px 6px;
+    font-size: 0.86rem;
+  }
+
+  .topbar-row,
+  .topbar-meta,
+  .summary-grid,
+  .dates-row,
+  .timings-grid,
+  .settings-grid {
+    gap: 6px;
+  }
+
+  .hero-prayer-card {
+    padding: 14px;
+    border-radius: 20px;
+    gap: 8px;
+  }
+
+  .hero-prayer-name {
+    font-size: clamp(1.7rem, 12vw, 2.6rem);
+  }
+
+  .hero-prayer-time {
+    min-height: 38px;
+    padding-inline: 12px;
+    font-size: 0.84rem;
+  }
+
+  .hero-countdown {
+    font-size: clamp(1.8rem, 14vw, 3rem);
+  }
+
+  .hero-status,
+  .panel-meta,
+  .metric-meta,
+  .search-status {
+    font-size: 0.9rem;
+  }
+
+  .summary-grid,
+  .dates-row,
+  .timings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-card strong,
+  .date-card strong {
+    font-size: 1.12rem;
+  }
+
+  .timing-card .timing-value {
+    font-size: 1.35rem;
+  }
+
+  .timing-card::after {
+    right: 12px;
+    bottom: 10px;
+    font-size: 0.62rem;
+  }
+
+  .favorites-list,
+  .quick-presets-list {
+    margin-inline: -2px;
+    padding-inline: 2px;
   }
 }
