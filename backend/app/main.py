@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
+from app.errors import AppError
 from app.rate_limit import InMemoryRateLimiter
 from app.schemas import (
     ApiErrorBody,
@@ -71,17 +72,6 @@ def api_error(code: str, message: str, details: dict | None = None) -> dict:
     return ApiErrorResponse(error=ApiErrorBody(code=code, message=message, details=details)).model_dump()
 
 
-def map_runtime_error(exc: RuntimeError) -> tuple[int, str]:
-    message = str(exc).lower()
-    if "timed out" in message or "timeout" in message:
-        return 504, "UPSTREAM_TIMEOUT"
-    if "429" in message or "rate" in message:
-        return 429, "RATE_LIMITED"
-    if "unavailable" in message:
-        return 502, "UPSTREAM_TIMEOUT"
-    return 502, "UPSTREAM_BAD_RESPONSE"
-
-
 def get_client_ip(request: Request) -> str:
     forwarded_for = request.headers.get("x-forwarded-for")
     if forwarded_for:
@@ -121,7 +111,13 @@ async def add_request_timing(request: Request, call_next):
         result = rate_limiter.check(f"{client_ip}:{request.url.path}")
         request.state.rate_limit_result = result
         if not result.allowed:
-            logger.warning("Rate limit exceeded", extra={"client_ip": client_ip, "path": request.url.path})
+            logger.warning(
+                "rate_limited path=%s client_ip=%s retry_after=%s request_id=%s",
+                request.url.path,
+                client_ip,
+                result.reset_after_seconds,
+                request_id,
+            )
             response = JSONResponse(
                 status_code=429,
                 content=api_error(
@@ -148,20 +144,28 @@ async def add_request_timing(request: Request, call_next):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     logger.info(
-        "%s %s -> %s in %sms",
+        "request_completed method=%s path=%s status=%s latency_ms=%s request_id=%s rate_limit_remaining=%s",
         request.method,
         request.url.path,
         response.status_code,
         duration_ms,
-        extra={"request_id": request_id},
+        request_id,
+        getattr(rate_limit_result, "remaining", "n/a"),
     )
     return response
 
 
-@app.exception_handler(RuntimeError)
-async def runtime_error_handler(_: Request, exc: RuntimeError) -> JSONResponse:
-    status_code, code = map_runtime_error(exc)
-    return JSONResponse(status_code=status_code, content=api_error(code, str(exc)))
+@app.exception_handler(AppError)
+async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+    logger.warning(
+        "app_error code=%s status=%s path=%s request_id=%s message=%s",
+        exc.code,
+        exc.status_code,
+        request.url.path,
+        getattr(request.state, "request_id", None),
+        exc.message,
+    )
+    return JSONResponse(status_code=exc.status_code, content=api_error(exc.code, exc.message, exc.details))
 
 
 @app.exception_handler(HTTPException)
@@ -178,7 +182,11 @@ async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception("Unhandled exception for request", extra={"path": request.url.path})
+    logger.exception(
+        "unhandled_exception path=%s request_id=%s",
+        request.url.path,
+        getattr(request.state, "request_id", None),
+    )
     return JSONResponse(
         status_code=500,
         content=api_error(
@@ -196,7 +204,17 @@ async def health() -> HealthResponse:
 
 @app.get("/ready", response_model=ReadinessResponse)
 async def ready() -> ReadinessResponse:
-    upstream_status = "ok" if await service.check_ready() else "degraded"
+    checks = {
+        "app": "ok",
+        "upstream_client": "unknown",
+        "rate_limiter": "ok" if settings.rate_limit_enabled else "disabled",
+    }
+    return ReadinessResponse(status="ok", checks=checks)
+
+
+@app.get("/ready/deep", response_model=ReadinessResponse)
+async def ready_deep() -> ReadinessResponse:
+    upstream_status = "ok" if await service.check_ready(use_cache=True, ttl_seconds=60) else "degraded"
     status = "ok" if upstream_status == "ok" else "degraded"
     checks = {
         "app": "ok",
@@ -272,17 +290,14 @@ async def get_prayer_times(
     school: int = Query(0, description="0 = Standard, 1 = Hanafi"),
     date_value: date = Query(default_factory=date.today, alias="date"),
 ) -> PrayerTimesResponse:
-    try:
-        request = build_prayer_request(
-            latitude=latitude,
-            longitude=longitude,
-            method=method,
-            school=school,
-            target_date=date_value,
-        )
-        return await service.get_prayer_times(request)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    request = build_prayer_request(
+        latitude=latitude,
+        longitude=longitude,
+        method=method,
+        school=school,
+        target_date=date_value,
+    )
+    return await service.get_prayer_times(request)
 
 
 @app.get(
@@ -300,18 +315,13 @@ async def get_prayer_times_today(
     date_value: date = Query(default_factory=date.today, alias="date"),
     school: int = Query(0),
 ) -> ApiPrayerTimesPayload:
-    try:
-        location = await service.resolve_location(
-            latitude=lat,
-            longitude=lng,
-            city=city,
-            country=country,
-            timezone=timezone,
-        )
-    except ValueError as exc:
-        detail = str(exc)
-        status_code = 404 if detail.startswith("City not found") else 400
-        raise HTTPException(status_code=status_code, detail=detail) from exc
+    location = await service.resolve_location(
+        latitude=lat,
+        longitude=lng,
+        city=city,
+        country=country,
+        timezone=timezone,
+    )
 
     legacy_response = await get_prayer_times(
         latitude=location.latitude,
@@ -336,17 +346,14 @@ async def get_prayer_calendar(
     year: int = Query(..., ge=2000, le=2100),
     month: int = Query(..., ge=1, le=12),
 ) -> PrayerCalendarResponse:
-    try:
-        return await service.get_prayer_calendar(
-            latitude=latitude,
-            longitude=longitude,
-            method=method,
-            school=school,
-            year=year,
-            month=month,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return await service.get_prayer_calendar(
+        latitude=latitude,
+        longitude=longitude,
+        method=method,
+        school=school,
+        year=year,
+        month=month,
+    )
 
 
 @app.get(
@@ -365,18 +372,13 @@ async def get_prayer_times_monthly(
     month: int = Query(..., ge=1, le=12),
     school: int = Query(0),
 ) -> ApiPrayerCalendarPayload:
-    try:
-        location = await service.resolve_location(
-            latitude=lat,
-            longitude=lng,
-            city=city,
-            country=country,
-            timezone=timezone,
-        )
-    except ValueError as exc:
-        detail = str(exc)
-        status_code = 404 if detail.startswith("City not found") else 400
-        raise HTTPException(status_code=status_code, detail=detail) from exc
+    location = await service.resolve_location(
+        latitude=lat,
+        longitude=lng,
+        city=city,
+        country=country,
+        timezone=timezone,
+    )
 
     legacy_response = await get_prayer_calendar(
         latitude=location.latitude,

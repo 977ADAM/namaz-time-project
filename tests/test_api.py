@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 
 from app.config import settings as base_settings
+from app.errors import UpstreamBadResponseError, UpstreamTimeoutError
 from app.main import app
 from app.schemas import (
     LocationResult,
@@ -35,11 +36,22 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("X-Process-Time-Ms", response.headers)
 
     async def test_ready_endpoint(self):
-        with patch("app.main.service.check_ready", AsyncMock(return_value=True)):
+        with patch("app.main.service.check_ready", AsyncMock(return_value=False)) as mocked_check:
             response = await self.client.get("/ready")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ok")
+        self.assertEqual(response.json()["checks"]["upstream_client"], "unknown")
+        mocked_check.assert_not_awaited()
+
+    async def test_ready_deep_endpoint_checks_cached_upstream_status(self):
+        with patch("app.main.service.check_ready", AsyncMock(return_value=True)) as mocked_check:
+            response = await self.client.get("/ready/deep")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "ok")
+        self.assertEqual(response.json()["checks"]["upstream_client"], "ok")
+        mocked_check.assert_awaited_once()
 
     async def test_meta_endpoint(self):
         response = await self.client.get("/v1/meta")
@@ -311,3 +323,23 @@ class ApiTests(unittest.IsolatedAsyncioTestCase):
         body = response.json()
         self.assertEqual(body["error"]["code"], "INTERNAL_ERROR")
         self.assertIn("request_id", body["error"]["details"])
+
+    async def test_typed_upstream_timeout_returns_normalized_api_error(self):
+        with patch(
+            "app.main.service.search_locations",
+            AsyncMock(side_effect=UpstreamTimeoutError("Location search timed out")),
+        ):
+            response = await self.client.get("/api/v1/cities/search", params={"q": "Moscow"})
+
+        self.assertEqual(response.status_code, 504)
+        self.assertEqual(response.json()["error"]["code"], "UPSTREAM_TIMEOUT")
+
+    async def test_typed_upstream_bad_response_returns_normalized_api_error(self):
+        with patch(
+            "app.main.service.search_locations",
+            AsyncMock(side_effect=UpstreamBadResponseError("Unexpected upstream payload")),
+        ):
+            response = await self.client.get("/api/v1/cities/search", params={"q": "Moscow"})
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.json()["error"]["code"], "UPSTREAM_BAD_RESPONSE")

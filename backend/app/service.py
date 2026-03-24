@@ -1,4 +1,5 @@
 import logging
+from asyncio import gather
 from datetime import date, datetime, timedelta
 from time import monotonic
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -6,6 +7,13 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import httpx
 
 from app.config import settings
+from app.errors import (
+    InvalidInputError,
+    NotFoundError,
+    UpstreamBadResponseError,
+    UpstreamRateLimitedError,
+    UpstreamTimeoutError,
+)
 from app.schemas import (
     ApiDateValue,
     ApiLocation,
@@ -57,6 +65,8 @@ class PrayerTimesService:
         self._calendar_cache: dict[tuple[float, float, int, int, int, int], tuple[float, PrayerCalendarResponse]] = {}
         self._timezone_cache: dict[tuple[float, float], tuple[float, str]] = {}
         self._location_cache: dict[tuple[float, float], tuple[float, LocationResult]] = {}
+        self._search_cache: dict[tuple[str, int], tuple[float, list[LocationResult]]] = {}
+        self._readiness_cache: tuple[float, bool] | None = None
         self._stats: dict[str, int] = {
             "daily_cache_hits": 0,
             "daily_cache_misses": 0,
@@ -66,12 +76,21 @@ class PrayerTimesService:
             "timezone_cache_misses": 0,
             "location_cache_hits": 0,
             "location_cache_misses": 0,
+            "search_cache_hits": 0,
+            "search_cache_misses": 0,
         }
 
     async def get_prayer_times(self, request: PrayerRequest) -> PrayerTimesResponse:
+        return await self._get_prayer_times_with_live_state(request)
+
+    async def _get_prayer_times_with_live_state(self, request: PrayerRequest) -> PrayerTimesResponse:
         self._validate_method(request.method)
         self._validate_school(request.school)
 
+        base_response = await self._get_or_fetch_prayer_times(request)
+        return await self._attach_live_prayer_state(base_response.model_copy(deep=True), request)
+
+    async def _get_or_fetch_prayer_times(self, request: PrayerRequest) -> PrayerTimesResponse:
         cache_key = self._build_cache_key(request)
         cached = self._get_cached(cache_key)
         if cached is not None:
@@ -82,9 +101,8 @@ class PrayerTimesService:
 
         payload = await self._fetch_timings(request)
         result = self._map_payload(request, payload)
-        result = await self._attach_live_prayer_state(result, request)
         self._cache_response(cache_key, result)
-        return result
+        return result.model_copy(deep=True)
 
     async def get_prayer_calendar(
         self,
@@ -119,25 +137,45 @@ class PrayerTimesService:
         return result
 
     async def search_locations(self, query: str, *, limit: int = 5) -> list[LocationResult]:
-        if not query.strip():
+        normalized_query = query.strip()
+        if not normalized_query:
             return []
+
+        cache_key = (normalized_query.casefold(), limit)
+        cached = self._search_cache.get(cache_key)
+        if cached is not None:
+            expires_at, results = cached
+            if expires_at > monotonic():
+                self._stats["search_cache_hits"] += 1
+                return [result.model_copy(deep=True) for result in results]
+            self._search_cache.pop(cache_key, None)
+        self._stats["search_cache_misses"] += 1
 
         client = await self._get_client()
         try:
             response = await client.get(
                 self.geo_search_url,
-                params={"q": query, "format": "jsonv2", "addressdetails": 1, "limit": limit},
+                params={"q": normalized_query, "format": "jsonv2", "addressdetails": 1, "limit": limit},
                 headers={"User-Agent": settings.app_name},
             )
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            raise RuntimeError(f"Location search failed with HTTP {exc.response.status_code}") from exc
+            if exc.response.status_code == 429:
+                raise UpstreamRateLimitedError("Location search rate limit exceeded") from exc
+            raise UpstreamBadResponseError(
+                f"Location search failed with HTTP {exc.response.status_code}",
+                {"status_code": exc.response.status_code},
+            ) from exc
         except httpx.RequestError as exc:
-            raise RuntimeError(f"Location search is unavailable: {exc}") from exc
+            raise UpstreamTimeoutError(f"Location search is unavailable: {exc}") from exc
 
         results = [self._map_location_result(item) for item in response.json()]
-        for result in results:
-            result.timezone = await self._resolve_timezone(result.latitude, result.longitude)
+        await self._attach_timezones(results)
+        if self.cache_ttl_seconds > 0:
+            self._search_cache[cache_key] = (
+                monotonic() + self.cache_ttl_seconds,
+                [result.model_copy(deep=True) for result in results],
+            )
         return results
 
     async def reverse_geocode(self, *, latitude: float, longitude: float) -> LocationResult:
@@ -166,9 +204,14 @@ class PrayerTimesService:
             )
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            raise RuntimeError(f"Reverse geocoding failed with HTTP {exc.response.status_code}") from exc
+            if exc.response.status_code == 429:
+                raise UpstreamRateLimitedError("Reverse geocoding rate limit exceeded") from exc
+            raise UpstreamBadResponseError(
+                f"Reverse geocoding failed with HTTP {exc.response.status_code}",
+                {"status_code": exc.response.status_code},
+            ) from exc
         except httpx.RequestError as exc:
-            raise RuntimeError(f"Reverse geocoding is unavailable: {exc}") from exc
+            raise UpstreamTimeoutError(f"Reverse geocoding is unavailable: {exc}") from exc
 
         result = self._map_location_result(response.json())
         result.timezone = await self._resolve_timezone(result.latitude, result.longitude)
@@ -192,12 +235,12 @@ class PrayerTimesService:
             return result
 
         if not city:
-            raise ValueError("Either lat/lng or city must be provided")
+            raise InvalidInputError("Either lat/lng or city must be provided")
 
         query = ", ".join(part for part in [city.strip(), (country or "").strip()] if part)
         results = await self.search_locations(query, limit=1)
         if not results:
-            raise ValueError(f"City not found: {city}")
+            raise NotFoundError(f"City not found: {city}", code="CITY_NOT_FOUND")
         result = results[0]
         if timezone:
             result.timezone = timezone
@@ -212,7 +255,11 @@ class PrayerTimesService:
                 return method
         raise ValueError(f"Invalid method={provider_id}. Allowed values: {sorted(self.ALLOWED_METHODS)}")
 
-    async def check_ready(self) -> bool:
+    async def check_ready(self, *, use_cache: bool = True, ttl_seconds: int = 60) -> bool:
+        if use_cache and self._readiness_cache is not None:
+            expires_at, cached_value = self._readiness_cache
+            if expires_at > monotonic():
+                return cached_value
         try:
             request = build_prayer_request(
                 latitude=55.7558,
@@ -222,8 +269,12 @@ class PrayerTimesService:
                 target_date=date.today(),
             )
             await self._fetch_timings(request)
-        except RuntimeError:
+        except (UpstreamBadResponseError, UpstreamRateLimitedError, UpstreamTimeoutError, RuntimeError):
+            if use_cache:
+                self._readiness_cache = (monotonic() + ttl_seconds, False)
             return False
+        if use_cache:
+            self._readiness_cache = (monotonic() + ttl_seconds, True)
         return True
 
     def get_stats(self) -> dict[str, int]:
@@ -300,8 +351,7 @@ class PrayerTimesService:
             school=request.school,
             target_date=request.target_date + timedelta(days=1),
         )
-        next_day_payload = await self._fetch_timings(next_day_request)
-        next_day_response = self._map_payload(next_day_request, next_day_payload)
+        next_day_response = await self._get_or_fetch_prayer_times(next_day_request)
         if next_day_response.timings.fajr:
             response.next_prayer = PrayerNameValue(
                 key="fajr",
@@ -361,15 +411,23 @@ class PrayerTimesService:
             response = await client.get(url, params=params)
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            raise RuntimeError(
-                f"Prayer API returned HTTP {exc.response.status_code} for {request.target_date.isoformat()}"
+            if exc.response.status_code == 429:
+                raise UpstreamRateLimitedError("Prayer API rate limit exceeded") from exc
+            raise UpstreamBadResponseError(
+                f"Prayer API returned HTTP {exc.response.status_code} for {request.target_date.isoformat()}",
+                {"status_code": exc.response.status_code, "date": request.target_date.isoformat()},
             ) from exc
         except httpx.RequestError as exc:
-            raise RuntimeError(f"Prayer API is unavailable: {exc}") from exc
+            raise UpstreamTimeoutError(
+                f"Prayer API is unavailable for {request.target_date.isoformat()}: {exc}"
+            ) from exc
 
         payload = response.json()
         if payload.get("code") != 200 or "data" not in payload:
-            raise RuntimeError("Prayer API returned an unexpected payload")
+            raise UpstreamBadResponseError(
+                "Prayer API returned an unexpected payload",
+                {"date": request.target_date.isoformat()},
+            )
 
         return payload
 
@@ -395,13 +453,21 @@ class PrayerTimesService:
             response = await client.get(url, params=params)
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            raise RuntimeError(f"Prayer calendar API returned HTTP {exc.response.status_code}") from exc
+            if exc.response.status_code == 429:
+                raise UpstreamRateLimitedError("Prayer calendar API rate limit exceeded") from exc
+            raise UpstreamBadResponseError(
+                f"Prayer calendar API returned HTTP {exc.response.status_code}",
+                {"status_code": exc.response.status_code, "year": year, "month": month},
+            ) from exc
         except httpx.RequestError as exc:
-            raise RuntimeError(f"Prayer calendar API is unavailable: {exc}") from exc
+            raise UpstreamTimeoutError(f"Prayer calendar API is unavailable: {exc}") from exc
 
         payload = response.json()
         if payload.get("code") != 200 or "data" not in payload:
-            raise RuntimeError("Prayer calendar API returned an unexpected payload")
+            raise UpstreamBadResponseError(
+                "Prayer calendar API returned an unexpected payload",
+                {"year": year, "month": month},
+            )
         return payload
 
     def _build_cache_key(self, request: PrayerRequest) -> tuple[float, float, int, int, str]:
@@ -542,12 +608,27 @@ class PrayerTimesService:
         try:
             payload = await self._fetch_timings(request)
             timezone = ((payload.get("data") or {}).get("meta") or {}).get("timezone")
-        except RuntimeError:
+        except (UpstreamBadResponseError, UpstreamRateLimitedError, UpstreamTimeoutError):
             timezone = None
 
         if timezone:
             self._timezone_cache[cache_key] = (monotonic() + self.cache_ttl_seconds, timezone)
         return timezone
+
+    async def _attach_timezones(self, results: list[LocationResult]) -> None:
+        unique_coordinates: dict[tuple[float, float], tuple[float, float]] = {}
+        for result in results:
+            cache_key = (round(result.latitude, 3), round(result.longitude, 3))
+            unique_coordinates.setdefault(cache_key, (result.latitude, result.longitude))
+
+        resolved = await gather(
+            *(self._resolve_timezone(lat, lng) for lat, lng in unique_coordinates.values())
+        )
+        timezone_by_key = {
+            cache_key: timezone for cache_key, timezone in zip(unique_coordinates.keys(), resolved, strict=False)
+        }
+        for result in results:
+            result.timezone = timezone_by_key.get((round(result.latitude, 3), round(result.longitude, 3)))
 
     @staticmethod
     def _map_location_result(item: dict) -> LocationResult:
@@ -650,14 +731,14 @@ class PrayerTimesService:
     @classmethod
     def _validate_method(cls, method: int) -> None:
         if method not in cls.ALLOWED_METHODS:
-            raise ValueError(
+            raise InvalidInputError(
                 f"Invalid method={method}. Allowed values: {sorted(cls.ALLOWED_METHODS)}"
             )
 
     @staticmethod
     def _validate_school(school: int) -> None:
         if school not in {0, 1}:
-            raise ValueError("school must be 0 (Standard) or 1 (Hanafi)")
+            raise InvalidInputError("school must be 0 (Standard) or 1 (Hanafi)")
 
 
 def build_prayer_request(

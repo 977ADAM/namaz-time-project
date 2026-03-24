@@ -1,8 +1,10 @@
 import unittest
 from datetime import date, datetime
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 from zoneinfo import ZoneInfo
 
+from app.errors import InvalidInputError
+from app.errors import UpstreamBadResponseError
 from app.service import PrayerTimesService, build_prayer_request
 
 
@@ -107,7 +109,7 @@ class PrayerTimesServiceTests(unittest.IsolatedAsyncioTestCase):
             target_date=date(2026, 3, 24),
         )
 
-        with self.assertRaisesRegex(ValueError, "Invalid method"):
+        with self.assertRaisesRegex(InvalidInputError, "Invalid method"):
             await service.get_prayer_times(request)
 
     async def test_get_prayer_calendar_maps_payload(self):
@@ -296,3 +298,113 @@ class PrayerTimesServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(result.current_prayer)
         self.assertEqual(result.next_prayer.key, "fajr")
         self.assertEqual(result.next_prayer_date, date(2026, 3, 24))
+
+    async def test_get_prayer_times_recomputes_live_state_from_cached_base_response(self):
+        service = PrayerTimesService(cache_ttl_seconds=300)
+        request = build_prayer_request(
+            latitude=55.7558,
+            longitude=37.6173,
+            method=2,
+            school=0,
+            target_date=date(2026, 3, 24),
+        )
+        upstream_payload = {
+            "code": 200,
+            "data": {
+                "timings": {
+                    "Fajr": "04:12 (+03)",
+                    "Sunrise": "05:55 (+03)",
+                    "Dhuhr": "12:31 (+03)",
+                    "Asr": "16:05 (+03)",
+                    "Maghrib": "19:04 (+03)",
+                    "Isha": "20:42 (+03)",
+                },
+                "date": {
+                    "readable": "24 Mar 2026",
+                    "timestamp": "1774306800",
+                    "gregorian": {"date": "24-03-2026"},
+                    "hijri": {"date": "05-10-1447"},
+                },
+                "meta": {
+                    "latitude": 55.7558,
+                    "longitude": 37.6173,
+                    "timezone": "Europe/Moscow",
+                    "method": {"id": 2, "name": "ISNA"},
+                },
+            },
+        }
+
+        with patch.object(service, "_fetch_timings", AsyncMock(return_value=upstream_payload)) as mocked_fetch:
+            with patch("app.service.datetime") as mocked_datetime:
+                mocked_datetime.now.return_value = datetime(2026, 3, 24, 12, 45, tzinfo=ZoneInfo("Europe/Moscow"))
+                mocked_datetime.combine.side_effect = datetime.combine
+                mocked_datetime.strptime.side_effect = datetime.strptime
+                mocked_datetime.min = datetime.min
+                first = await service.get_prayer_times(request)
+
+            with patch("app.service.datetime") as mocked_datetime:
+                mocked_datetime.now.return_value = datetime(2026, 3, 24, 19, 30, tzinfo=ZoneInfo("Europe/Moscow"))
+                mocked_datetime.combine.side_effect = datetime.combine
+                mocked_datetime.strptime.side_effect = datetime.strptime
+                mocked_datetime.min = datetime.min
+                second = await service.get_prayer_times(request)
+
+        self.assertEqual(mocked_fetch.await_count, 1)
+        self.assertEqual(first.current_prayer.key, "dhuhr")
+        self.assertEqual(first.next_prayer.key, "asr")
+        self.assertEqual(second.current_prayer.key, "maghrib")
+        self.assertEqual(second.next_prayer.key, "isha")
+
+    async def test_check_ready_returns_false_when_upstream_payload_is_invalid(self):
+        service = PrayerTimesService()
+
+        with patch.object(
+            service,
+            "_fetch_timings",
+            AsyncMock(side_effect=UpstreamBadResponseError("bad payload")),
+        ):
+            result = await service.check_ready()
+
+        self.assertFalse(result)
+
+    async def test_check_ready_uses_cached_probe_result(self):
+        service = PrayerTimesService()
+
+        with patch.object(service, "_fetch_timings", AsyncMock(return_value={"code": 200, "data": {}})) as mocked_fetch:
+            first = await service.check_ready(use_cache=True, ttl_seconds=60)
+            second = await service.check_ready(use_cache=True, ttl_seconds=60)
+
+        self.assertTrue(first)
+        self.assertTrue(second)
+        self.assertEqual(mocked_fetch.await_count, 1)
+
+    async def test_search_locations_uses_query_cache(self):
+        service = PrayerTimesService(cache_ttl_seconds=300)
+        search_payload = [
+            {
+                "place_id": 1,
+                "lat": "55.7558",
+                "lon": "37.6173",
+                "display_name": "Moscow, Russia",
+                "address": {"city": "Moscow", "country": "Russia", "state": "Moscow"},
+            }
+        ]
+
+        mocked_response = Mock()
+        mocked_response.json.return_value = search_payload
+        mocked_response.raise_for_status.return_value = None
+
+        with (
+            patch.object(service, "_get_client", AsyncMock()) as mocked_get_client,
+            patch.object(service, "_resolve_timezone", AsyncMock(return_value="Europe/Moscow")) as mocked_timezone,
+        ):
+            mocked_client = mocked_get_client.return_value
+            mocked_client.get = AsyncMock(return_value=mocked_response)
+
+            first = await service.search_locations("Moscow", limit=5)
+            second = await service.search_locations("Moscow", limit=5)
+
+        self.assertEqual(mocked_client.get.await_count, 1)
+        self.assertEqual(mocked_timezone.await_count, 1)
+        self.assertEqual(first[0].timezone, "Europe/Moscow")
+        self.assertEqual(second[0].timezone, "Europe/Moscow")

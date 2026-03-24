@@ -7,7 +7,13 @@ dependencies = [
     "fastapi>=0.115.0",
     "httpx>=0.28.0",
     "pydantic>=2.10.0",
+    "pydantic-settings>=2.6.0",
     "uvicorn>=0.34.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
 ]
 
 [build-system]
@@ -19,3 +25,8 @@ package-dir = {"" = "backend"}
 
 [tool.setuptools.packages.find]
 where = ["backend"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q"

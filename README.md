@@ -248,7 +248,7 @@ docker compose down
 ## Тесты
 
 ```bash
-./venv/bin/python -m unittest discover -s tests -t . -v
+./venv/bin/python -m pytest
 ```
 
 ## Что стоит добавить во вторую фазу
